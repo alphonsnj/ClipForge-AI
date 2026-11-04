@@ -342,9 +342,9 @@ export default function WorkspacePage() {
   const [passwordChangeOpen, setPasswordChangeOpen] = useState(false);
   const [newTeamName, setNewTeamName] = useState("");
   const [teamCreateError, setTeamCreateError] = useState("");
+  const [copiedWorkspaceId, setCopiedWorkspaceId] = useState<string | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [config, setConfig] = useState<IntakeConfig | null>(null);
-  const [projectName, setProjectName] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -584,14 +584,15 @@ export default function WorkspacePage() {
     setError("");
     setMessage("");
     try {
+      const nextProjectNumber = projects.length + 1;
+      const defaultProjectName = `Project ${String(nextProjectNumber).padStart(2, "0")}`;
       const response = await apiFetch(`${API}/api/projects`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: projectName.trim(), team_id: selectedTeamId || null }),
+        body: JSON.stringify({ name: defaultProjectName, team_id: selectedTeamId || null }),
       });
       if (!response.ok) throw new Error(await responseError(response));
-      setProjectName("");
-      setMessage("Project created. Add a permission-cleared video when you’re ready.");
+      setMessage(`${defaultProjectName} created. Add a video you have permission to process when you’re ready.`);
       await loadWorkspace();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "The project could not be created.");
@@ -755,6 +756,15 @@ export default function WorkspacePage() {
     } catch (reason) { setTeamCreateError(reason instanceof Error ? reason.message : "The workspace could not be created."); }
   }
 
+  async function copyWorkspaceId(team: TeamAccount) {
+    try {
+      await navigator.clipboard.writeText(team.id);
+      setCopiedWorkspaceId(team.id);
+    } catch {
+      setInviteError("Clipboard access is unavailable. Select the workspace ID to copy it manually.");
+    }
+  }
+
   async function removeMember(team: TeamAccount, member: TeamMember) {
     if (!window.confirm(`Remove ${member.email} from ${team.name}?`)) return;
     try {
@@ -781,7 +791,7 @@ export default function WorkspacePage() {
     <header className="workspace-header"><Link className="workspace-wordmark" href="/">CLIPFORGE <span>AI</span></Link><Link className="workspace-back" href="/">Back to the story ↗</Link></header>
     <section className="auth-card"><p className="workspace-eyebrow"><span /> PRIVATE WORKSPACE</p>
       <h1>{authMode === "register" ? "Set up your" : authMode === "accept" ? "Join the" : "Welcome"}<br /><em>{authMode === "accept" ? "team." : "workspace."}</em></h1>
-      <p>{authMode === "register" ? "Create the first local owner account. New accounts can join only through a workspace invitation." : authMode === "accept" ? "Use the invited email and either create its password or confirm your existing password." : "Sign in to view projects in your workspaces."}</p>
+      <p>{authMode === "register" ? "Create your account. Your personal workspace is set up automatically; you can invite people later if you need to." : authMode === "accept" ? "Use the invited email and either create its password or confirm your existing password." : "Sign in to open your workspace and projects."}</p>
       <form onSubmit={(event) => void submitAuth(event)}>
         <label>Email<input type="email" autoComplete="email" required maxLength={320} value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} /></label>
         <label>Password<input type="password" autoComplete={authMode === "login" ? "current-password" : "new-password"} minLength={12} maxLength={128} required value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} /></label>
@@ -807,18 +817,25 @@ export default function WorkspacePage() {
         {passwordChangeOpen && <form className="password-change" onSubmit={(event) => void changePassword(event)}><label>Current password<input name="current-password" type="password" autoComplete="current-password" required /></label><label>New password<input name="new-password" type="password" autoComplete="new-password" minLength={12} maxLength={128} required /></label><button type="submit">Update password</button></form>}
       </section>
 
-      {teams.map((team) => <section className="team-panel" key={team.id} aria-label={`${team.name} access`}>
-        <div className="team-panel-heading"><div><p className="panel-kicker">WORKSPACE ACCESS</p><strong>{team.name}</strong><span>Your role: {team.role}</span></div></div>
-        {team.role === "owner" && <form className="team-invite-form" onSubmit={(event) => void createInvitation(event, team)}><label>Invite by email<input type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} maxLength={320} required placeholder="colleague@example.com" /></label><label>Role<select value={inviteRole} onChange={(event) => setInviteRole(event.target.value as "editor" | "reviewer")}><option value="reviewer">Reviewer · view only</option><option value="editor">Editor · edit and render</option></select></label><button type="submit">Create 24-hour invitation</button></form>}
-        {inviteUrl && team.role === "owner" && <div className="invite-link"><label>Share this one-time invite link<input readOnly value={inviteUrl} onFocus={(event) => event.currentTarget.select()} /></label><button type="button" onClick={() => void navigator.clipboard?.writeText(inviteUrl)}>Copy link</button></div>}
-        {inviteError && <p role="alert" className="workspace-error">{inviteError}</p>}
-        <ul className="team-member-list">{(teamMembers[team.id] ?? []).map((member) => <li key={member.membership_id}><span>{member.email}</span><span>{member.role}</span>{team.role === "owner" && member.role !== "owner" && <button type="button" onClick={() => void removeMember(team, member)}>Remove</button>}</li>)}</ul>
-        <p className="team-local-note">Invitations are copied manually. Invite links grant access to this workspace and expire after 24 hours.</p>
-      </section>)}
-      <form className="create-team-form" onSubmit={(event) => void createTeam(event)}><label>New workspace<input value={newTeamName} onChange={(event) => setNewTeamName(event.target.value)} maxLength={120} required placeholder="Workspace name" /></label><button type="submit">Create workspace</button>{teamCreateError && <p role="alert">{teamCreateError}</p>}</form>
+      <details className="workspace-settings">
+        <summary>Optional workspace settings <span>IDs, extra spaces, and invitations</span></summary>
+        <div className="workspace-settings-content">
+          {teams.map((team) => <section className="team-panel" key={team.id} aria-label={`${team.name} access`}>
+            <div className="team-panel-heading"><span className="team-avatar" aria-hidden="true">{team.name.trim().slice(0, 1).toUpperCase() || "W"}</span><div><p className="panel-kicker">{team.role.toUpperCase()} WORKSPACE</p><strong>{team.name}</strong></div></div>
+            <label className="workspace-id-label">Workspace ID<input aria-label={`${team.name} workspace ID`} readOnly value={team.id} onFocus={(event) => event.currentTarget.select()} /></label>
+            {team.role === "owner" && <button className="copy-workspace-id" type="button" onClick={() => void copyWorkspaceId(team)}>{copiedWorkspaceId === team.id ? "Workspace ID copied" : "Copy workspace ID"}</button>}
+            {team.role === "owner" && <details className="invite-settings"><summary>Invite colleagues (optional)</summary><form className="team-invite-form" onSubmit={(event) => void createInvitation(event, team)}><label>Email<input type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} maxLength={320} required placeholder="colleague@example.com" /></label><label>Access<select value={inviteRole} onChange={(event) => setInviteRole(event.target.value as "editor" | "reviewer")}><option value="reviewer">View only</option><option value="editor">Can edit and render</option></select></label><button type="submit">Create invitation</button></form></details>}
+            {inviteUrl && team.role === "owner" && <div className="invite-link"><label>One-time invite link<input readOnly value={inviteUrl} onFocus={(event) => event.currentTarget.select()} /></label><button type="button" onClick={() => void navigator.clipboard?.writeText(inviteUrl)}>Copy link</button></div>}
+            {inviteError && <p role="alert" className="workspace-error">{inviteError}</p>}
+            <ul className="team-member-list">{(teamMembers[team.id] ?? []).map((member) => <li key={member.membership_id}><span>{member.email}</span><span>{member.role}</span>{team.role === "owner" && member.role !== "owner" && <button type="button" onClick={() => void removeMember(team, member)}>Remove</button>}</li>)}</ul>
+            {team.role === "owner" && <p className="team-local-note">Invite links expire after 24 hours. You can ignore this section if you work alone.</p>}
+          </section>)}
+          <form className="create-team-form" onSubmit={(event) => void createTeam(event)}><label>Workspace name<input value={newTeamName} onChange={(event) => setNewTeamName(event.target.value)} maxLength={120} required placeholder="Name another workspace" /></label><button type="submit">Create workspace</button>{teamCreateError && <p role="alert">{teamCreateError}</p>}<p className="workspace-create-note">A unique ID and matching icon are generated automatically.</p></form>
+        </div>
+      </details>
 
       <section className="workspace-intro">
-        <p className="workspace-eyebrow"><span /> MILESTONE 06 · PRIVATE TEAM WORKSPACES</p>
+        <p className="workspace-eyebrow"><span /> YOUR CREATOR SPACE</p>
         <h1>Shape the<br /><em>moment.</em></h1>
         <p className="workspace-lede">Transcribe a permitted video, review and edit transcript-aligned moments, then render a private portrait draft for preview and download.</p>
         <div className="workspace-policy">
@@ -833,11 +850,8 @@ export default function WorkspacePage() {
         <div className="projects-heading"><div><p className="workspace-eyebrow"><span /> YOUR WORKSPACE</p><h2 id="projects-heading">Projects <span>{projects.length.toString().padStart(2, "0")}</span></h2></div><span className="local-badge"><i /> LOCAL</span></div>
 
         {teams.some((team) => team.role !== "reviewer") && <form className="create-project" onSubmit={createProject}>
-          <label className="sr-only" htmlFor="project-name">Project name</label>
-          <input id="project-name" name="project-name" autoComplete="off" maxLength={120} placeholder="Name a new project…" value={projectName} onChange={(event) => setProjectName(event.target.value)} required />
-          {teams.filter((team) => team.role !== "reviewer").length > 1 && <label className="sr-only" htmlFor="project-team">Workspace</label>}
-          {teams.filter((team) => team.role !== "reviewer").length > 1 && <select id="project-team" value={selectedTeamId} onChange={(event) => setSelectedTeamId(event.target.value)} aria-label="Project workspace">{teams.filter((team) => team.role !== "reviewer").map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select>}
-          <button type="submit" disabled={busyId === "create" || !projectName.trim()}>{busyId === "create" ? "Creating…" : "New project"}<span aria-hidden="true">↗</span></button>
+          <p>Create a project, then upload a video or save a YouTube link as a reference.</p>
+          <button type="submit" disabled={busyId === "create"}>{busyId === "create" ? "Creating…" : "＋  New project"}</button>
         </form>}
 
         {message && <p className="workspace-message" role="status">{message}</p>}
