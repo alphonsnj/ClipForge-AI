@@ -44,12 +44,12 @@ This was one generated English voice sample, not representative creator media. I
 - Repeated frontend typecheck and optimized build under Node.js `22.23.4`, matching the documented Node 22 line.
 - FFmpeg smoke rendered a generated 4-second color/audio source using the application render helpers for 9:16, 1:1, and 16:9. Output geometries matched 720×1280, 720×720, and 1280×720; each output duration was 3.5 seconds. Burn-in captions were exercised on portrait and SRT sidecars on all presets. This verifies technical output generation only; no visual review on representative footage was done.
 - Trivy 0.76.1 scanned the local Compose image tags. Redis had no HIGH/CRITICAL findings; PostgreSQL had no Alpine OS-package HIGH/CRITICAL findings and 26 generic Go stdlib findings in the embedded `gosu` binary. The exact findings are temporarily suppressed only for PURL `pkg:golang/stdlib@v1.24.6`, with an expiry of 4 February 2027, based on gosu's upstream scanner guidance. This does not establish call-path absence independently and is not a fix; reevaluation is required. GitHub's scheduled/pull-request scan has not run.
-- Workflow actions are pinned to commit SHAs for checkout, setup-node, setup-python, and Trivy; the SHAs were checked against their published version refs. The Trivy Action input for YAML ignore files was confirmed and the exact ignore file was exercised locally with 26 suppressed results.
+- Workflow checkout/setup actions are pinned to commit SHAs checked against their published version refs. Trivy runs from a digest-pinned scanner container, and the exact ignore file was exercised locally with 26 suppressed results.
 - Final repository checks passed: Python syntax compilation, Compose configuration validation, Ruby YAML parsing for CI/Dependabot/Trivy ignore config, shell syntax for backup scripts, and `git diff --check`.
 
 ### Remaining evidence gaps
 
-- The GitHub Actions jobs still need remote execution after the branch is pushed.
+- The initial GitHub Actions run exposed incorrect checkout/setup-node SHA assignments and a Trivy Action installer failure. The workflow was revised to use the correctly mapped action commit IDs and a digest-pinned Trivy container; rerun CI on the updated PR before accepting it.
 - The vulnerability audits describe the dependency state on this date; repeat them in CI and review each future finding. The Trivy YAML ignore format is experimental, so confirm the pinned action honors it in GitHub CI.
 - Request/job events do not yet provide exception redaction, metrics, alert routing, or a deployment runbook.
 - No user-provided representative media, human candidate ratings, browser/editor review, production target platform decisions, or external security assessment were available for this validation.

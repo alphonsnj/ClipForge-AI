@@ -16,8 +16,8 @@ jobs:
     name: Frontend build and dependency audit
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
-      - uses: actions/setup-node@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 22
           package-manager-cache: false
@@ -34,7 +34,7 @@ jobs:
     name: Backend syntax and dependency audit
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: "3.12"
@@ -50,13 +50,19 @@ jobs:
       matrix:
         image: ["postgres:16-alpine", "redis:7-alpine"]
     steps:
-      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        with:
-          scan-type: image
-          image-ref: ${{ matrix.image }}
-          format: table
-          exit-code: "1"
-          ignore-unfixed: true
-          vuln-type: os,library
-          severity: CRITICAL,HIGH
-          trivyignores: .trivyignore.yaml
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Scan Compose image for high and critical vulnerabilities
+        env:
+          IMAGE: ${{ matrix.image }}
+        run: >-
+          docker run --rm
+          -v "$GITHUB_WORKSPACE:/workspace:ro"
+          aquasec/trivy:0.76.1@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c
+          image --image-src remote
+          --ignorefile /workspace/.trivyignore.yaml
+          --ignore-unfixed
+          --severity CRITICAL,HIGH
+          --scanners vuln
+          --exit-code 1
+          --no-progress
+          "$IMAGE"
