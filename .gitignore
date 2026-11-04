@@ -1,0 +1,34 @@
+# Local secrets/configuration
+.env
+.env.*
+!.env.example
+backend/.env
+frontend/.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+*.tsbuildinfo
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+coverage/
+npm-debug.log*
+
+# Local media, model weights, and generated output
+data/
+media/
+models/
+outputs/
+backups/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
