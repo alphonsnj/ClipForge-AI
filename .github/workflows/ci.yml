@@ -48,17 +48,24 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        image: ["postgres:16-alpine", "redis:7-alpine"]
+        image: ["clipforge-postgres:16-alpine", "redis:7-alpine"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - if: matrix.image == 'clipforge-postgres:16-alpine'
+        name: Build PostgreSQL image with patched gosu
+        run: docker build -f docker/postgres.Dockerfile -t clipforge-postgres:16-alpine .
+      - if: matrix.image == 'redis:7-alpine'
+        name: Pull Redis Compose image
+        run: docker pull redis:7-alpine
       - name: Scan Compose image for high and critical vulnerabilities
         env:
           IMAGE: ${{ matrix.image }}
         run: >-
           docker run --rm
+          -v /var/run/docker.sock:/var/run/docker.sock
           -v "$GITHUB_WORKSPACE:/workspace:ro"
           aquasec/trivy:0.76.1@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c
-          image --image-src remote
+          image --image-src docker
           --ignorefile /workspace/.trivyignore.yaml
           --ignore-unfixed
           --severity CRITICAL,HIGH

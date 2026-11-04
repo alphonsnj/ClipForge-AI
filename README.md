@@ -7,7 +7,7 @@ ClipForge AI is a local-first product for turning long-form video into reviewabl
 - Next.js landing page shell (`http://localhost:3000`)
 - FastAPI liveness endpoint (`http://localhost:8000/health`)
 - FastAPI dependency readiness endpoint (`http://localhost:8000/health/ready`)
-- PostgreSQL 16 and Redis 7 with health checks and persistent local volumes
+- PostgreSQL 16 and Redis 7 with health checks and persistent local volumes; PostgreSQL is built locally with pinned gosu 1.20 source and a govulncheck gate
 - Local project creation and private MP4/MOV upload with permission confirmation
 - PostgreSQL migrations, file and duration limits, local storage quota, deletion, and seven-day source expiry
 - Durable transcription jobs and timestamped transcript segments stored in PostgreSQL
@@ -38,7 +38,7 @@ Open Docker Desktop and wait for it to start. From the project root:
 cp .env.example .env
 cp backend/.env.example backend/.env
 cp frontend/.env.example frontend/.env.local
-docker compose up -d
+docker compose up -d --build
 ```
 
 Start the frontend in one terminal:
