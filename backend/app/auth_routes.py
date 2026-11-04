@@ -6,13 +6,13 @@ import hmac
 import os
 import re
 import secrets
-import time
-from collections import OrderedDict
 from datetime import timedelta
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from redis.asyncio import Redis
+from redis.exceptions import RedisError
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,10 +30,15 @@ team_router = APIRouter(prefix="/api/teams", tags=["teams"], dependencies=[Depen
 Session = Annotated[AsyncSession, Depends(get_session)]
 UserDep = Annotated[User, Depends(current_user)]
 ContextDep = Annotated[AuthContext, Depends(auth_context)]
-FAILURES: OrderedDict[str, list[float]] = OrderedDict()
 MAX_LOGIN_FAILURES = 10
 LOGIN_WINDOW_SECONDS = 900
-MAX_TRACKED_LOGIN_ADDRESSES = 10_000
+_INCREMENT_LOGIN_FAILURE = """
+local count = redis.call('INCR', KEYS[1])
+if count == 1 then
+  redis.call('EXPIRE', KEYS[1], ARGV[1])
+end
+return count
+"""
 
 
 def hash_password(password: str) -> str:
@@ -92,17 +97,23 @@ async def _account_payload(db: AsyncSession, user: User, csrf: str) -> dict[str,
             "csrf_token": csrf}
 
 
-def _check_login_rate(request: Request) -> str:
+def _login_failure_key(request: Request) -> str:
     address = request.client.host if request.client else "unknown"
-    now = time.monotonic()
-    recent = [stamp for stamp in FAILURES.get(address, []) if now - stamp < LOGIN_WINDOW_SECONDS]
-    FAILURES[address] = recent
-    FAILURES.move_to_end(address)
-    if len(FAILURES) > MAX_TRACKED_LOGIN_ADDRESSES:
-        FAILURES.popitem(last=False)
-    if len(recent) >= MAX_LOGIN_FAILURES:
+    secret = os.getenv(
+        "LOGIN_RATE_LIMIT_HASH_KEY",
+        "clipforge-development-only-login-rate-key-change-before-deployment",
+    ).encode("utf-8")
+    digest = hmac.new(secret, address.encode("utf-8"), hashlib.sha256).hexdigest()
+    return f"clipforge:auth:login-failures:{digest}"
+
+
+async def _check_login_rate(redis: Redis, key: str) -> None:
+    try:
+        failures = int(await redis.get(key) or 0)
+    except RedisError:
+        raise HTTPException(503, "Sign-in is temporarily unavailable. Please try again shortly.") from None
+    if failures >= MAX_LOGIN_FAILURES:
         raise HTTPException(429, "Too many sign-in attempts. Wait 15 minutes and try again.")
-    return address
 
 
 @router.get("/api/auth/status")
@@ -143,14 +154,22 @@ async def register_first_owner(payload: AccountCredentials, request: Request, re
 @router.post("/api/auth/login")
 async def login(payload: AccountCredentials, request: Request, response: Response, session: Session) -> dict[str, object]:
     enforce_same_origin(request)
-    address = _check_login_rate(request)
+    redis: Redis | None = getattr(request.app.state, "redis", None)
+    if redis is None:
+        raise HTTPException(503, "Sign-in is temporarily unavailable. Please try again shortly.")
+    failure_key = _login_failure_key(request)
+    await _check_login_rate(redis, failure_key)
     email = normalize_email(payload.email)
     user = await session.scalar(select(User).where(User.email == email))
     valid = await asyncio.to_thread(verify_password, payload.password, user.password_hash if user else DUMMY_PASSWORD_HASH)
     if not user or not valid:
-        FAILURES[address].append(time.monotonic())
+        try:
+            failures = int(await redis.eval(_INCREMENT_LOGIN_FAILURE, 1, failure_key, LOGIN_WINDOW_SECONDS))
+        except RedisError:
+            raise HTTPException(503, "Sign-in is temporarily unavailable. Please try again shortly.") from None
+        if failures > MAX_LOGIN_FAILURES:
+            raise HTTPException(429, "Too many sign-in attempts. Wait 15 minutes and try again.")
         raise HTTPException(401, "Email or password is incorrect.")
-    FAILURES.pop(address, None)
     csrf = await _new_session(session, user, response)
     await session.commit()
     return await _account_payload(session, user, csrf)

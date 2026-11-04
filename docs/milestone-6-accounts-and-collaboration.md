@@ -19,7 +19,7 @@ Projects belong to a team. Every project, source preview, transcription, candida
 - Passwords require 12–128 characters and are stored using salted `scrypt` hashes (`N=32768`, `r=8`, `p=1`); passwords are never stored or logged in plaintext.
 - Opaque, random session tokens are held in `HttpOnly` cookies; only SHA-256 token verifiers are stored in PostgreSQL. Sessions expire after 14 days. Password changes revoke the account's old sessions and issue a fresh one.
 - Mutating browser requests require an allowed `Origin`, a separate CSRF cookie, and a matching `X-CSRF-Token` header verified against the session record. CORS allows credentials only for the configured frontend origins.
-- Login failure throttling is in process memory: ten failures per IP per 15 minutes. It resets on restart and is not suitable as the only rate control in a shared deployment.
+- Failed-login counters are stored in shared Redis: ten failures per peer IP per 15 minutes across API processes. Keys use an HMAC digest of the address; production requires a deployment-managed `LOGIN_RATE_LIMIT_HASH_KEY`. Sign-in fails closed when Redis is unavailable. Behind a reverse proxy, configure trusted proxy address handling before enabling public login; the application does not trust arbitrary forwarded-IP headers.
 - `AUTH_COOKIE_SECURE=false` supports the local HTTP setup. Set it to `true` behind HTTPS. Do not expose the development app to a public or shared network.
 
 The password/session approach follows OWASP recommendations to use slow password hashing, high-entropy opaque session IDs, HttpOnly cookies, and CSRF defenses. See the [OWASP Password Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html) and [Session Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html).
@@ -30,4 +30,4 @@ Apply `0009_accounts_and_teams` with `alembic upgrade head`, then restart API an
 
 ## Not yet implemented
 
-There is no email delivery or email ownership verification, forgotten-password recovery, MFA, account deletion, external identity provider, invitation revocation, centralized/distributed rate limiting, security audit log, or production TLS/session-key operations guide. Provider choice, email verification, recovery, MFA, and deployment controls must be decided before any public or shared deployment. These remain Milestone 7 security and production-readiness work.
+There is no email delivery or email ownership verification, forgotten-password recovery, MFA, account deletion, external identity provider, invitation revocation, security audit log, rate-limit alerting, or production TLS/session-key operations guide. Provider choice, email verification, recovery, MFA, trusted proxy rules, alerting, and deployment controls must be decided before any public or shared deployment. These remain Milestone 7 security and production-readiness work.

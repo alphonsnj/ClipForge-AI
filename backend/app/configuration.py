@@ -31,6 +31,7 @@ def validate_runtime_configuration() -> None:
     database_url = os.getenv("DATABASE_URL", "")
     redis_url = os.getenv("REDIS_URL", "")
     frontend_url = os.getenv("FRONTEND_BASE_URL", "")
+    rate_limit_key = os.getenv("LOGIN_RATE_LIMIT_HASH_KEY", "")
     origins = [item.strip() for item in os.getenv("CORS_ORIGINS", "").split(",") if item.strip()]
     try:
         database = urlsplit(database_url)
@@ -44,6 +45,8 @@ def validate_runtime_configuration() -> None:
         problems.append("REDIS_URL must explicitly identify the deployment queue service")
     if os.getenv("AUTH_COOKIE_SECURE", "false").strip().lower() != "true":
         problems.append("AUTH_COOKIE_SECURE must be true")
+    if len(rate_limit_key) < 32 or rate_limit_key.startswith("clipforge-development-only"):
+        problems.append("LOGIN_RATE_LIMIT_HASH_KEY must be a deployment-managed secret of at least 32 characters")
     if not _is_https_origin(frontend_url):
         problems.append("FRONTEND_BASE_URL must be an HTTPS origin")
     if not origins or any(not _is_https_origin(origin) for origin in origins):

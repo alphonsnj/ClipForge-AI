@@ -16,7 +16,7 @@ This is a source-level review of the local-development API, auth/session handlin
 
 | Finding | Impact | Required before shared/public use |
 | --- | --- | --- |
-| Login throttling is process-local and keyed by client IP, with a bounded in-memory address table. | It is not shared across replicas and is not a reliable public abuse control. | Add a distributed limiter, proxy-aware client identity rules, and alerting. |
+| Failed-login throttling now uses shared Redis and an HMAC of the peer IP; it fails closed if Redis is unavailable. | This is shared across API replicas, but an untrusted or misconfigured reverse proxy can make peer-IP identity ineffective or group all users behind one address. | Configure trusted proxy addresses, tune thresholds for expected shared networks, monitor 429/503 events, and review the control independently before public use. |
 | No verified email, recovery, MFA, invitation revocation, or account deletion flow. | Account ownership and recovery cannot meet common hosted-service needs. | Select an identity policy and implement/review its lifecycle. |
 | Exception tracebacks are not centrally redacted. | Runtime/SQL diagnostics could expose local paths or operational details. | Define a redaction policy, test it, and restrict log access/retention. |
 | Local database/media archives are not encrypted and the database archive excludes media. | Local archive files expose user data and are incomplete for full recovery. | Choose encrypted storage, backup coverage, retention, access policy, and restore objectives. |

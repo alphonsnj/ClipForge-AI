@@ -32,11 +32,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         "postgresql://clipforge:clipforge_local_only@localhost:5432/clipforge",
     )
     app.state.redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    app.state.redis = Redis.from_url(
+        app.state.redis_url,
+        socket_connect_timeout=2,
+        socket_timeout=2,
+        decode_responses=True,
+    )
     cleanup_task = asyncio.create_task(expiry_worker(), name="source-expiry-cleanup")
     try:
         yield
     finally:
         await stop_expiry_worker(cleanup_task)
+        await app.state.redis.aclose()
         await engine.dispose()
 
 
