@@ -1,0 +1,30 @@
+# Local security review - 4 November 2026
+
+## Scope and limits
+
+This is a source-level review of the local-development API, auth/session handling, project/source access, media path handling, FFmpeg invocation, and the CI configuration. It is not a penetration test, legal review, independent assessment, or production security approval. The local workflow smoke checks and dependency audits are recorded in the [validation log](validation-log.md).
+
+## Controls observed
+
+- Project, transcription, candidate, and render routes use the session/team access dependency; reviewers are read-only and destructive project/source operations are owner-only.
+- Mutating browser routes require an allowed Origin and matching session-bound CSRF token. Session IDs are random and stored as hashes; passwords use salted scrypt.
+- Uploaded bytes are size-limited, probed with FFprobe, stored under generated UUID keys in a private local directory, and served through authenticated routes. Storage paths are constrained beneath the configured root.
+- FFmpeg is invoked with an argument array rather than a shell command. Captions are escaped for ASS output. Worker events avoid logging source filenames and FFmpeg stderr.
+- PostgreSQL and Redis Compose ports bind to loopback. Dependency audits reported no known findings on the review date.
+
+## Findings that remain open
+
+| Finding | Impact | Required before shared/public use |
+| --- | --- | --- |
+| Failed-login throttling now uses shared Redis and an HMAC of the peer IP; it fails closed if Redis is unavailable. Rate-limit and limiter-outage events omit address and account data. | This is shared across API replicas, but an untrusted or misconfigured reverse proxy can make peer-IP identity ineffective or group all users behind one address. Events have no alert route. | Set exact `TRUSTED_PROXY_IPS` values with `python -m app.server`, tune thresholds for expected shared networks, route 429/503 events to an operator, and review the control independently before public use. |
+| No verified email, recovery, MFA, invitation revocation, or account deletion flow. | Account ownership and recovery cannot meet common hosted-service needs. | Select an identity policy and implement/review its lifecycle. |
+| Application recovery paths now log exception class names without exception text or tracebacks, and the production-oriented Uvicorn entry point disables access logs that can include query strings. Framework/process-level logs are not centrally redacted or routed here. | Unconfigured process logs may expose operational details; excessive or incorrectly configured collection can retain sensitive metadata. | Configure and independently review centralized redaction, access restrictions, retention, and alert routing for the selected deployment. |
+| Local database/media archives are not encrypted and the database archive excludes media. | Local archive files expose user data and are incomplete for full recovery. | Choose encrypted storage, backup coverage, retention, access policy, and restore objectives. |
+| `AUTH_COOKIE_SECURE` defaults to false for HTTP development. | A deployment that retains the development setting could send session cookies over HTTP. | A startup guard now refuses `APP_ENV=production` unless the database URL is explicit and not using the local-only password, Redis/Redis-TLS is explicit, and frontend/CORS origins use HTTPS. Deployment still needs independent review. |
+| The CI and Dependabot configuration is present; the draft PR's follow-up CI run passed all four jobs on 4 November 2026. | A single pass does not establish long-term dependency or floating base-image safety. | Keep scheduled and PR CI enabled, review each Dependabot proposal, and investigate future scanner findings rather than carrying exceptions forward automatically. |
+| The PostgreSQL image scan reports 26 HIGH/CRITICAL findings against the Go standard library embedded in `/usr/local/bin/gosu`; the PostgreSQL Alpine OS package scan is clean. | Generic scanners identify vulnerable standard-library APIs without establishing that this small utility calls those code paths. gosu maintainers document this false-positive pattern and direct users to call-path analysis. | A temporary Trivy exception is limited to the exact reported CVE IDs and `pkg:golang/stdlib@v1.24.6`, and expires 4 February 2027. Re-run the scan and reassess the exception before expiry or when the image/gosu component changes. This is a scanner exception, not a vulnerability remediation. |
+| The upstream PostgreSQL image's gosu 1.19 used vulnerable `github.com/moby/sys/user` v0.1.0 (GO-2026-6686); govulncheck identifies reachable parsing functions. | The moderate DoS advisory applies if an attacker can supply crafted passwd/group-style input. The official base image had this real dependency finding, which Trivy did not surface. | Resolved for the Compose service: it builds a local image with upstream gosu 1.20 from a pinned source commit and checks source and final binary with govulncheck; the patched dependency is v0.4.1. The local build/startup/query smoke and GitHub image-build/scan job passed. The upstream base tag itself remains unchanged and should not be used directly for deployments; retain independent production review. |
+| GitHub Actions references can move when they use release tags, and the Trivy Action experienced a 2026 supply-chain compromise affecting older releases. | Mutable references can change what CI executes without a repository change. | CI actions are pinned to the verified v7/v0.36.0 commit IDs; Dependabot remains configured to propose reviewed updates. Recheck action provenance before accepting updates. |
+| No independent security assessment or privacy/legal review has occurred. | Source review cannot establish resistance to real-world attacks or compliance. | Complete qualified review against the selected jurisdiction, product scope, and deployment. |
+
+Keep the service bound to the local machine until these items are addressed and the production-readiness gates in [Milestone 7](milestone-7-production-readiness.md) have evidence.

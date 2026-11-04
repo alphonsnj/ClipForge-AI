@@ -1,0 +1,131 @@
+services:
+  postgres:
+    image: clipforge-postgres:16-alpine
+    build:
+      context: .
+      dockerfile: docker/postgres.Dockerfile
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-clipforge}
+      POSTGRES_USER: ${POSTGRES_USER:-clipforge}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-clipforge_local_only}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: "no"
+    command: ["alembic", "upgrade", "head"]
+    environment: &local-backend-environment
+      APP_ENV: development
+      HOST: 0.0.0.0
+      DATABASE_URL: ${DATABASE_URL:-postgresql://clipforge:clipforge_local_only@postgres:5432/clipforge}
+      REDIS_URL: redis://redis:6379/0
+      FRONTEND_BASE_URL: http://localhost:3000
+      CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+      AUTH_COOKIE_SECURE: "false"
+      LOGIN_RATE_LIMIT_HASH_KEY: clipforge-development-only-login-rate-key-change-before-deployment
+      TRUSTED_PROXY_IPS: 127.0.0.1,::1
+      MEDIA_STORAGE_DIR: /var/lib/clipforge/media
+      RENDER_STORAGE_DIR: /var/lib/clipforge/outputs
+      MODEL_CACHE_DIR: /var/lib/clipforge/models
+      SOURCE_RETENTION_DAYS: ${SOURCE_RETENTION_DAYS:-7}
+      MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-524288000}
+      MAX_MEDIA_STORAGE_BYTES: ${MAX_MEDIA_STORAGE_BYTES:-2147483648}
+      MAX_VIDEO_DURATION_SECONDS: ${MAX_VIDEO_DURATION_SECONDS:-3600}
+      WHISPER_MODEL_ID: ${WHISPER_MODEL_ID:-small}
+      WHISPER_MODEL_REVISION: ${WHISPER_MODEL_REVISION:-536b0662742c02347bc0e980a01041f333bce120}
+      WHISPER_DEVICE: ${WHISPER_DEVICE:-cpu}
+      WHISPER_COMPUTE_TYPE: ${WHISPER_COMPUTE_TYPE:-int8}
+      WHISPER_CPU_THREADS: ${WHISPER_CPU_THREADS:-4}
+      RENDER_TIMEOUT_SECONDS: ${RENDER_TIMEOUT_SECONDS:-900}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment: *local-backend-environment
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - clipforge_media:/var/lib/clipforge
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: ["python", "-m", "app.worker"]
+    environment: *local-backend-environment
+    volumes:
+      - clipforge_media:/var/lib/clipforge
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    stop_grace_period: 2m
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then(r => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  postgres_data:
+  redis_data:
+  clipforge_media:

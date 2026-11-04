@@ -1,0 +1,9 @@
+node_modules
+.next
+out
+coverage
+.env.local
+.env
+.env.*
+!.env.example
+npm-debug.log*
