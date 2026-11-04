@@ -18,7 +18,7 @@ Local defaults: 180 seconds maximum per clip, 500 MB maximum per output, 2 GB ag
 
 ## Required runtime setup
 
-Apply Alembic migrations through `0007_creator_editor_state`, install FFmpeg/FFprobe in the worker environment, then restart API and worker. The UI preview and download endpoints require the API to be reachable from the browser. The repository's Compose file currently provisions Postgres and Redis only, so this milestone does not claim a complete containerized application runtime.
+The local Docker Compose stack builds FFmpeg into the backend image, applies the current Alembic migrations, and runs the API and worker. Start it from the repository root with `docker compose up -d --build`. The UI preview and download endpoints require the API to be reachable from the browser. Hosted rendering remains gated on representative-media acceptance and deployment capacity review.
 
 ## Acceptance still required
 

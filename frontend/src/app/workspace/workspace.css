@@ -40,3 +40,12 @@
 .create-project button{min-height:2.75rem;flex:none;border-radius:8px;background:#294b38;color:white;font-size:.9rem}
 .create-project button span{margin-left:0}
 @media(max-width:650px){.workspace-settings>summary{align-items:flex-start;flex-wrap:wrap}.workspace-settings>summary span{width:100%;padding-left:0}.workspace-settings-content .team-panel{align-items:flex-start}.workspace-id-label{width:100%}.create-project{align-items:stretch;flex-direction:column}.create-project button{width:100%;min-height:3rem}}
+.candidate-options{grid-template-columns:minmax(0,1fr) auto;align-items:center}
+.candidate-advanced{min-width:0}
+.candidate-advanced>summary{color:#596557;font-size:.78rem;cursor:pointer;list-style:none}
+.candidate-advanced>summary::-webkit-details-marker{display:none}
+.candidate-advanced>summary::before{content:"＋ ";color:#71866f}
+.candidate-advanced[open]>summary::before{content:"− "}
+.candidate-advanced-grid{display:grid;grid-template-columns:repeat(3,minmax(70px,1fr));gap:8px;margin-top:10px}
+.candidate-options>button{grid-column:2;grid-row:1;min-height:38px;border-radius:7px;background:#294b38;color:white}
+@media(max-width:650px){.candidate-options{grid-template-columns:1fr}.candidate-advanced-grid{grid-template-columns:1fr 1fr}.candidate-options>button{grid-column:1;grid-row:auto;width:100%}}

@@ -46,4 +46,4 @@ Accept the default only after the longest supported sample completes without exh
 - Retryable extraction or unexpected runtime failure: a safe message and failure code are stored; project/source state remains intact.
 - Cancellation during extraction or inference: the job is marked cancelled immediately, while the active process is allowed to finish its current command/call; its result is not persisted.
 
-This is a local-development workflow without authentication. Keep the API, worker, and workspace bound to the local machine.
+This workflow uses the local account and workspace access controls. It has not been reviewed for shared or public deployment; keep the local API and worker bound to the machine.

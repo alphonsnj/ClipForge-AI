@@ -4,7 +4,7 @@
 
 ## Candidate-window behavior
 
-1. A creator chooses a minimum and maximum duration for a completed transcript and a maximum number of windows to return (1–100).
+1. A creator can run the default 15–60 second, maximum 10-window search with one click. Optional advanced settings allow a minimum and maximum duration and a maximum number of windows to return (1–100).
 2. The generator finds transcript segment boundaries at the source beginning or after segment text ending in common sentence punctuation.
 3. For each start boundary, it selects the earliest sentence-ending boundary that meets the requested minimum while staying within the maximum.
 4. Each suggestion retains the original millisecond boundaries and complete overlapping transcript-segment text. The code never estimates word timing inside a segment.
@@ -33,4 +33,4 @@ Before adding automated ranking, agree on target languages and permission-cleare
 - Candidate titles are time labels; summaries are not generated. The creator can edit the title and range.
 - No audio-quality score, semantic relevance score, novelty score, or virality estimate is computed.
 
-This remains a local-development workflow without authentication. Do not expose the API, worker, or workspace to a network.
+This workflow uses the local account and workspace access controls. It has not been reviewed for shared or public deployment; keep the local API and worker bound to the machine.

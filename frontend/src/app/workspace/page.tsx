@@ -897,12 +897,17 @@ export default function WorkspacePage() {
                     </div>
                     {latestJob?.status === "complete" && <section className="candidate-panel" aria-label={`Highlight candidates for ${project.name}`}>
                       <div className="candidate-panel-heading"><div><p className="panel-kicker">MILESTONE 03 · REVIEWABLE MOMENTS</p><strong>Find candidate windows</strong></div><span className="candidate-count">{latestRun ? latestRun.candidates.length.toString().padStart(2, "0") : "—"}</span></div>
-                      <p className="candidate-explainer">Choose a duration range and how many windows to review. These are transcript-aligned, chronological suggestions—not quality scores or virality predictions.</p>
+                      <p className="candidate-explainer">Find up to 10 moments between 15 and 60 seconds. Suggestions follow the story in source order; they are not virality predictions.</p>
                       {canEdit && <form className="candidate-options" onSubmit={(event) => void createCandidateRun(event, project, latestJob)}>
-                        <label>Minimum seconds<input name="min-duration" type="number" min="1" max="3600" step="1" required /></label>
-                        <label>Maximum seconds<input name="max-duration" type="number" min="1" max="3600" step="1" required /></label>
-                        <label>Max windows<input name="candidate-limit" type="number" min="1" max="100" step="1" required /></label>
-                        <button type="submit" disabled={busyId === project.id}>{busyId === project.id ? "Finding windows…" : "Find moments"}<span aria-hidden="true">↗</span></button>
+                        <details className="candidate-advanced">
+                          <summary>Adjust clip length or number (optional)</summary>
+                          <div className="candidate-advanced-grid">
+                            <label>Minimum seconds<input name="min-duration" type="number" min="1" max="3600" step="1" defaultValue="15" required /></label>
+                            <label>Maximum seconds<input name="max-duration" type="number" min="1" max="3600" step="1" defaultValue="60" required /></label>
+                            <label>Maximum clips<input name="candidate-limit" type="number" min="1" max="100" step="1" defaultValue="10" required /></label>
+                          </div>
+                        </details>
+                        <button type="submit" disabled={busyId === project.id}>{busyId === project.id ? "Finding moments…" : "Find moments"}</button>
                       </form>}
                       {latestRun && <div className="candidate-run-results">
                         <p className="candidate-run-meta">{latestRun.total_candidates} eligible windows · {latestRun.min_duration_seconds}–{latestRun.max_duration_seconds}s · sorted by source time{latestRun.sampled_evenly ? ` · ${latestRun.candidates.length} sampled evenly across the source` : ""}</p>

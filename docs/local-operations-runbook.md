@@ -7,12 +7,14 @@ For a deployment-oriented API process, use `python -m app.server` from `backend/
 ## Start and check services
 
 1. Start Docker Desktop.
-2. From the repository root, run `docker compose up -d`.
-3. Confirm PostgreSQL and Redis are healthy with `docker compose ps`.
-4. In the backend environment, apply schema changes with `alembic upgrade head`.
-5. Start the API, frontend, and one worker using the commands in the root README.
-6. Check `http://localhost:8000/health` for API liveness and `http://localhost:8000/health/ready` for PostgreSQL and Redis readiness.
-7. Correlate API requests by the `X-Request-ID` response header. API request completion and selected worker lifecycle events are JSON log lines. Request events omit query strings and bodies.
+2. From the repository root, run `docker compose up -d --build`. The local Compose stack runs PostgreSQL, Redis, migrations, API, one worker, and the frontend.
+3. Confirm the API and frontend are healthy with `docker compose ps`; the database and cache must also report healthy.
+4. Open `http://localhost:3000`, create or sign in to the local owner account, create a project, and upload a permission-cleared MP4/MOV source.
+5. Check `http://localhost:8000/health` for API liveness and `http://localhost:8000/health/ready` for PostgreSQL and Redis readiness.
+6. Correlate API requests by the `X-Request-ID` response header. API request completion and selected worker lifecycle events are JSON log lines. Request events omit query strings and bodies.
+7. Stop the stack with `docker compose down`; this keeps local database, cache, and media volumes. `docker compose down -v` deletes those volumes and their data.
+
+For manual host development, see the separate instructions in the root README. Do not run a second API or worker against the same local database unless deliberately validating multi-process behavior.
 
 ## Database backup and restore check
 
