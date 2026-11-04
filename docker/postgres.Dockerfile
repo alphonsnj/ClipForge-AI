@@ -18,6 +18,7 @@ RUN go install golang.org/x/vuln/cmd/govulncheck@v1.1.4 \
 RUN mkdir -p /out \
     && CGO_ENABLED=0 GOOS=linux GOARCH="$TARGETARCH" \
     go build -mod=readonly -trimpath -buildvcs=false -o /out/gosu .
+RUN /go/bin/govulncheck -mode=binary /out/gosu
 
 FROM postgres:16-alpine
 COPY --from=gosu-builder /out/gosu /usr/local/bin/gosu
