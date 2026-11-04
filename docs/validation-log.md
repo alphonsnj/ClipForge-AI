@@ -49,7 +49,7 @@ This was one generated English voice sample, not representative creator media. I
 
 ### Remaining evidence gaps
 
-- The initial GitHub Actions run exposed incorrect checkout/setup-node SHA assignments and a Trivy Action installer failure. The workflow was revised to use the correctly mapped action commit IDs and a digest-pinned Trivy container; rerun CI on the updated PR before accepting it.
+- The initial GitHub Actions run exposed incorrect checkout/setup-node SHA assignments and a Trivy Action installer failure. The workflow was revised to use the correctly mapped action commit IDs and a digest-pinned Trivy container. The follow-up PR run completed successfully: frontend build/audit, backend compile/audit, and both image scans passed.
 - The vulnerability audits describe the dependency state on this date; repeat them in CI and review each future finding. The Trivy YAML ignore format is experimental, so confirm the pinned action honors it in GitHub CI.
 - Request/job events do not yet provide exception redaction, metrics, alert routing, or a deployment runbook.
 - No user-provided representative media, human candidate ratings, browser/editor review, production target platform decisions, or external security assessment were available for this validation.
