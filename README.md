@@ -85,6 +85,8 @@ Stop local services with `docker compose down`. This keeps the development volum
 
 For a deployment behind an HTTPS reverse proxy, run the API from `backend/` with `python -m app.server`, set `HOST` and `PORT` for the private application interface, and set `TRUSTED_PROXY_IPS` to the exact proxy IPs/CIDRs. Uvicorn will honor forwarded client addresses only from those peers; the default trusts loopback only. Do not expose the API directly to untrusted networks. This entry point does not make the application production-ready by itself.
 
+Hosted launch preparation is captured in the [provisional launch plan](docs/hosted-launch-plan.md) and [`compose.hosted.yaml`](compose.hosted.yaml). The package is a single-node private-beta scaffold with same-origin proxy routing, isolated data networks, resource caps, private persistent volumes, and a one-time private first-owner bootstrap. It is not deployed and its example configuration intentionally contains invalid placeholders.
+
 ## Roadmap
 
 See the [implementation roadmap](docs/implementation-roadmap.md) for the staged scope, exit criteria, dependencies, and open decisions. Local backup/restore tooling, CI dependency/image scans, structured request/job/auth events, and local operations/security-review notes have been added. The [internal launch policy brief](docs/launch-policy-brief.md) records implementation facts and decisions for future jurisdiction-specific review; it is not a publishable policy. Representative-media transcription and candidate evaluation, editor/browser review, and independent security review remain open. Local account controls do not satisfy public deployment requirements.

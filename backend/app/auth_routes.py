@@ -123,6 +123,8 @@ async def _check_login_rate(redis: Redis, key: str) -> None:
 
 @router.get("/api/auth/status")
 async def auth_status(session: Session) -> dict[str, bool]:
+    if os.getenv("APP_ENV", "development").strip().lower() == "production":
+        return {"needs_setup": False}
     count = await session.scalar(select(func.count(User.id)))
     return {"needs_setup": int(count or 0) == 0}
 
@@ -130,6 +132,8 @@ async def auth_status(session: Session) -> dict[str, bool]:
 @router.post("/api/auth/register", status_code=status.HTTP_201_CREATED)
 async def register_first_owner(payload: AccountCredentials, request: Request, response: Response, session: Session) -> dict[str, object]:
     enforce_same_origin(request)
+    if os.getenv("APP_ENV", "development").strip().lower() == "production":
+        raise HTTPException(404, "Account setup is disabled. Contact the workspace administrator.")
     await session.execute(text("SELECT pg_advisory_xact_lock(1128813132, 6)"))
     count = await session.scalar(select(func.count(User.id)))
     if count:

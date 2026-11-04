@@ -2,7 +2,7 @@
 
 ## Current decision
 
-ClipForge is still a local-development application. This milestone begins with a readiness assessment and a launch gate, not a public deployment. The repository does not yet define a hosting provider, storage region, operating budget, public privacy/terms policy, support contact, or availability target. Those choices affect architecture and must be recorded before provisioning or exposing a service.
+ClipForge is still a local-development application. The owner has requested hosted-launch preparation and authorized conservative provisional defaults, but no service has been provisioned or exposed. The provider, actual region, monthly budget, domain, public privacy/terms policy, support contact, and availability target remain unselected. The [hosted launch plan](hosted-launch-plan.md) records provisional architecture and decisions; resolve the owner and legal gates before provisioning or public access.
 
 ## Current posture
 
@@ -15,12 +15,13 @@ ClipForge is still a local-development application. This milestone begins with a
 | Job processing | API and worker code process CPU-intensive jobs and call FFmpeg/faster-whisper. | Set measured concurrency, CPU/memory/disk quotas, job timeouts, queue limits, retry policy, cancellation behavior, and worker isolation based on representative workloads. |
 | Observability | Health and dependency-readiness endpoints exist. Request completion and selected worker lifecycle events are JSON logged; requests receive a server-generated correlation ID. Application recovery paths log only exception classes, not exception messages or tracebacks. A local operations runbook is present. | Configure framework/process log redaction, job-level metrics, alert routing, log access/retention, and error ownership. Do not log credentials, session tokens, source URLs with secrets, or transcript/media content. |
 | Privacy and operations | Source retention defaults to seven days; local deletion controls exist. | Publish data processing, rights, retention, deletion, privacy, terms, acceptable-use, and support information. Define incident response and user-request handling. |
+| Hosted deployment scaffold | Provider-neutral single-node Compose stack, non-root API/worker and frontend images, isolated database/Redis network, loopback-only app ports, and one-time private owner bootstrap are prepared. | Select a provider/region/domain and HTTPS ingress; validate actual proxy peer IP, secret delivery, host firewall, encrypted storage/backups, image digests, and measured resource limits. |
 
 Local PostgreSQL backup and restore-check commands are available in `scripts/db-backup.sh` and `scripts/db-restore-check.sh`. The archive is custom-format PostgreSQL data, includes account/project records, is not encrypted by these scripts, and excludes local media, model files, and render outputs. It is a local restore drill aid, not a production backup service.
 
-Setting `APP_ENV=production` now fails startup unless the application has an explicit PostgreSQL URL without the local-only password, an explicit Redis/Redis-TLS endpoint, secure cookies, and HTTPS frontend/CORS origins. This blocks common development defaults; it does not certify the rest of a deployment.
+Setting `APP_ENV=production` now fails startup unless the application has an explicit PostgreSQL URL without a placeholder/local-only password, an explicit Redis/Redis-TLS endpoint, secure cookies, HTTPS frontend/CORS origins, and valid trusted proxy addresses. The production `/api/auth/register` endpoint is disabled; create the first owner through `python -m app.bootstrap_owner` from a private terminal. These controls block common deployment mistakes; they do not certify the rest of a deployment.
 
-GitHub CI defines frontend typecheck/build and npm audit, backend syntax compilation and pip-audit, and high/critical vulnerability scans of the PostgreSQL and Redis Compose images. The jobs passed on the draft PR on 4 November 2026. Dependabot is configured for npm, pip, Compose images, and GitHub Actions. Keep scheduled CI enabled and review future findings.
+GitHub CI defines frontend typecheck/build and npm audit, backend syntax compilation and pip-audit, and high/critical image scans for the PostgreSQL, Redis, API/worker, and Next.js images. The latest run for a future hosted-scaffold change must pass before treating these images as reviewed. Dependabot is configured for npm, pip, Compose images, and GitHub Actions. Keep scheduled CI enabled and review future findings.
 
 The source-level security review and local runbook are recorded in `security-review-2026-11-04.md` and `local-operations-runbook.md`. The [internal launch policy brief](launch-policy-brief.md) captures verified local data flows and the choices a reviewer needs. These documents describe local controls and open review items; none is a production sign-off or a public policy.
 
@@ -39,6 +40,7 @@ The source-level security review and local runbook are recorded in `security-rev
 
 - Extend request/job events with centralized exception redaction, metrics, and alert routing.
 - Start the API with `python -m app.server`; configure `TRUSTED_PROXY_IPS` to the exact proxy IPs/CIDRs when deployed behind a proxy. Never trust arbitrary forwarded headers.
+- Use `compose.hosted.yaml` as a provisional single-host package. Complete the owner, domain, provider, budget, TLS, secret, backup, monitoring, and review decisions in `hosted-launch-plan.md` before exposing it.
 - Run the local restore-check command against a fresh database archive and record the restored migration revision; define encrypted production backup and media restore separately.
 - Measure resource consumption and job durations using permission-cleared samples.
 - Resolve or document findings from the CI dependency and container-image scans.

@@ -18,6 +18,7 @@ from .db import SessionFactory, engine
 from .intake import STORAGE_DIR, safe_storage_path
 from .models import CandidateRun, HighlightCandidate, RenderJob, Source, TranscriptionJob, TranscriptSegment, utc_now
 from .observability import emit_event, emit_failure
+from .configuration import validate_runtime_configuration
 
 logger = logging.getLogger("clipforge.worker")
 QUEUE_NAME = "clipforge:transcription-jobs"
@@ -588,6 +589,7 @@ async def run_worker() -> None:
 
 
 def main() -> None:
+    validate_runtime_configuration()
     logging.basicConfig(
         level=os.getenv("LOG_LEVEL", "INFO").upper(),
         format="%(asctime)s %(levelname)s %(name)s %(message)s",

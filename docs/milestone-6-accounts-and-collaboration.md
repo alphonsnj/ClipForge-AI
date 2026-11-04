@@ -2,7 +2,7 @@
 
 ## Local account workflow
 
-This stage uses provider-neutral, self-hosted accounts so the local product workflow can be reviewed before choosing an external identity provider. The first account created after migration is the initial owner; later accounts are invitation-only. The initial owner claims the migration-created `Local workspace`, which also preserves access to any pre-existing projects assigned to that legacy team.
+This stage uses provider-neutral, self-hosted accounts so the local product workflow can be reviewed before choosing an external identity provider. In development, the first account created after migration is the initial owner. In production, public first-account registration is disabled and the initial owner is created from a private terminal with `python -m app.bootstrap_owner`; later accounts are invitation-only. The bootstrap command claims the migration-created `Local workspace`, preserving access to any pre-existing projects assigned to that legacy team.
 
 Owners can create additional workspaces, invite editors or reviewers, copy a one-time invitation link, and remove members. Invitations expire after 24 hours and are stored as token hashes. No invitation email is sent. The invitee proves possession of the link and creates a password; an existing account must confirm its password before joining the additional workspace.
 
@@ -28,7 +28,7 @@ The password/session approach follows OWASP recommendations to use slow password
 
 ## Migration and configuration
 
-Apply `0009_accounts_and_teams` with `alembic upgrade head`, then restart API and frontend. Configure `CORS_ORIGINS`, `FRONTEND_BASE_URL`, and `AUTH_COOKIE_SECURE` in `backend/.env`. Existing unowned local project rows are assigned to a migration-created starter team and claimed by the first owner at setup.
+Apply `0009_accounts_and_teams` with `alembic upgrade head`, then restart API and frontend. Configure `CORS_ORIGINS`, `FRONTEND_BASE_URL`, and `AUTH_COOKIE_SECURE` in `backend/.env`. Existing unowned local project rows are assigned to a migration-created starter team and claimed by the initial owner at setup. For production bootstrap, run the command from a private admin terminal before enabling public ingress.
 
 ## Not yet implemented
 

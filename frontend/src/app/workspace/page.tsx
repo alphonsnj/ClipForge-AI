@@ -100,7 +100,7 @@ type IntakeConfig = {
   access_scope: string;
 };
 
-const API = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000").replace(/\/+$/, "");
+const API = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000").replace(/\/+$/, "");
 let csrfToken = "";
 
 function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
