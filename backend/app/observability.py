@@ -13,6 +13,11 @@ def emit_event(logger: logging.Logger, event: str, **fields: str | int | float |
     logger.info(json.dumps({"event": event, **fields}, separators=(",", ":"), sort_keys=True))
 
 
+def emit_failure(logger: logging.Logger, event: str, error: BaseException) -> None:
+    """Record an unexpected failure without exception text, paths, or traceback data."""
+    emit_event(logger, event, error_type=type(error).__name__)
+
+
 class RequestLogMiddleware:
     """Add a server-generated correlation ID and log route metadata, never request bodies."""
 

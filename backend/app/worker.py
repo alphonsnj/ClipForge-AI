@@ -17,7 +17,7 @@ from sqlalchemy.orm import selectinload
 from .db import SessionFactory, engine
 from .intake import STORAGE_DIR, safe_storage_path
 from .models import CandidateRun, HighlightCandidate, RenderJob, Source, TranscriptionJob, TranscriptSegment, utc_now
-from .observability import emit_event
+from .observability import emit_event, emit_failure
 
 logger = logging.getLogger("clipforge.worker")
 QUEUE_NAME = "clipforge:transcription-jobs"
@@ -434,8 +434,8 @@ async def extract_audio(source_path: Path, target_path: Path) -> None:
 async def heartbeat_task(job: ClaimedJob, stop: asyncio.Event) -> None:
     try:
         await heartbeat(job, stop)
-    except Exception:
-        logger.exception("Could not renew lease for transcription job %s", job.id)
+    except Exception as error:
+        emit_failure(logger, "transcription.lease_renewal.failed", error)
 
 
 async def process_job(job: ClaimedJob) -> None:
@@ -527,8 +527,8 @@ async def process_job(job: ClaimedJob) -> None:
             finished=True,
         )
         emit_event(logger, "transcription.failed", job_id=str(job.id), failure_code=error.code)
-    except Exception:
-        logger.exception("Transcription job %s failed unexpectedly", job.id)
+    except Exception as error:
+        emit_failure(logger, "transcription.failed_unexpectedly", error)
         await update_job(
             job,
             status="failed",
@@ -562,15 +562,15 @@ async def run_worker() -> None:
                     if job is not None:
                         try:
                             await process_job(job)
-                        except Exception:
-                            logger.exception("Worker loop recovered from job %s", job.id)
+                        except Exception as error:
+                            emit_failure(logger, "worker.job_recovered", error)
                         continue
                     render_job = await claim_next_render_job()
                     if render_job is not None:
                         try:
                             await process_render_job(render_job)
-                        except Exception:
-                            logger.exception("Worker loop recovered from render %s", render_job.id)
+                        except Exception as error:
+                            emit_failure(logger, "worker.render_recovered", error)
                         continue
                     try:
                         await redis.blpop(QUEUE_NAME, timeout=5)
@@ -579,8 +579,8 @@ async def run_worker() -> None:
                         await asyncio.sleep(5)
                 except asyncio.CancelledError:
                     raise
-                except Exception:
-                    logger.exception("Worker loop encountered a transient error")
+                except Exception as error:
+                    emit_failure(logger, "worker.loop_transient_failure", error)
                     await asyncio.sleep(5)
         finally:
             await redis.aclose()

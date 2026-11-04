@@ -44,7 +44,7 @@ async def notify_worker(job_id: UUID) -> None:
             try:
                 await client.aclose()
             except Exception:
-                logger.debug("Redis connection close failed after notification", exc_info=True)
+                logger.debug("Redis connection close failed after notification")
 
 
 @router.post(

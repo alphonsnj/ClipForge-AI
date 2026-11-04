@@ -30,6 +30,7 @@ from .intake import (
 from .models import CandidateRun, HighlightCandidate, Project, RenderJob, Source, TeamMembership, User, utc_now
 from .schemas import ProjectCreate, ProjectRead, YouTubeReferenceCreate
 from .rendering import unlink_render_key
+from .observability import emit_failure
 
 
 def remove_source_renders(jobs: list[RenderJob]) -> None:
@@ -255,7 +256,7 @@ async def delete_source(project_id: UUID, session: Session) -> Response:
         remove_source_renders(jobs)
         unlink_media(source.storage_key)
     except (OSError, ValueError) as error:
-        logger.exception("Could not remove source %s", source.id)
+        emit_failure(logger, "source.delete.failed", error)
         raise HTTPException(500, "The source could not be deleted. Try again.") from error
     await session.delete(source)
     await session.commit()
@@ -295,7 +296,7 @@ async def delete_project(project_id: UUID, session: Session) -> Response:
             remove_source_renders(jobs)
             unlink_media(source.storage_key)
     except (OSError, ValueError) as error:
-        logger.exception("Could not remove media while deleting project %s", project_id)
+        emit_failure(logger, "project.delete_media.failed", error)
         raise HTTPException(500, "Project media could not be deleted. Try again.") from error
     await session.delete(project)
     await session.commit()
@@ -318,8 +319,8 @@ async def expire_sources_once() -> None:
                 remove_source_renders(jobs)
                 safe_storage_path(source.storage_key).unlink(missing_ok=True)
                 removed.append(source)
-            except (OSError, ValueError):
-                logger.exception("Could not expire source %s", source.id)
+            except (OSError, ValueError) as error:
+                emit_failure(logger, "source.expiry_item.failed", error)
         for source in removed:
             await session.delete(source)
         if removed:
@@ -332,8 +333,8 @@ async def expiry_worker() -> None:
             await expire_sources_once()
         except asyncio.CancelledError:
             raise
-        except Exception:
-            logger.exception("Source expiry cleanup failed; it will retry")
+        except Exception as error:
+            emit_failure(logger, "source.expiry_cleanup.failed", error)
         await asyncio.sleep(300)
 
 

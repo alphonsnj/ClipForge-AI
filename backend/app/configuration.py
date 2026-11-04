@@ -1,6 +1,7 @@
 """Startup checks that prevent accidental production use of local defaults."""
 
 import os
+import ipaddress
 from urllib.parse import urlsplit
 
 
@@ -51,6 +52,12 @@ def validate_runtime_configuration() -> None:
         problems.append("FRONTEND_BASE_URL must be an HTTPS origin")
     if not origins or any(not _is_https_origin(origin) for origin in origins):
         problems.append("CORS_ORIGINS must contain only HTTPS origins")
+    trusted_proxies = [item.strip() for item in os.getenv("TRUSTED_PROXY_IPS", "127.0.0.1,::1").split(",") if item.strip()]
+    try:
+        for proxy in trusted_proxies:
+            ipaddress.ip_network(proxy, strict=False)
+    except ValueError:
+        problems.append("TRUSTED_PROXY_IPS must contain comma-separated IP addresses or CIDRs")
 
     if problems:
         raise RuntimeError("Unsafe production configuration: " + "; ".join(problems))

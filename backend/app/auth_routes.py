@@ -3,6 +3,7 @@
 import asyncio
 import hashlib
 import hmac
+import logging
 import os
 import re
 import secrets
@@ -24,6 +25,7 @@ from .db import get_session
 from .models import (AuthSession, Project, Team, TeamInvitation, TeamMembership,
                      User, utc_now)
 from .schemas import AccountCredentials, InvitationAccept, PasswordChange, TeamCreate, TeamInvitationCreate
+from .observability import emit_event
 
 router = APIRouter(tags=["accounts"])
 team_router = APIRouter(prefix="/api/teams", tags=["teams"], dependencies=[Depends(enforce_access)])
@@ -32,6 +34,7 @@ UserDep = Annotated[User, Depends(current_user)]
 ContextDep = Annotated[AuthContext, Depends(auth_context)]
 MAX_LOGIN_FAILURES = 10
 LOGIN_WINDOW_SECONDS = 900
+auth_logger = logging.getLogger("clipforge.auth")
 _INCREMENT_LOGIN_FAILURE = """
 local count = redis.call('INCR', KEYS[1])
 if count == 1 then
@@ -111,8 +114,10 @@ async def _check_login_rate(redis: Redis, key: str) -> None:
     try:
         failures = int(await redis.get(key) or 0)
     except RedisError:
+        emit_event(auth_logger, "auth.login_limiter.unavailable")
         raise HTTPException(503, "Sign-in is temporarily unavailable. Please try again shortly.") from None
     if failures >= MAX_LOGIN_FAILURES:
+        emit_event(auth_logger, "auth.login.rate_limited")
         raise HTTPException(429, "Too many sign-in attempts. Wait 15 minutes and try again.")
 
 
@@ -166,6 +171,7 @@ async def login(payload: AccountCredentials, request: Request, response: Respons
         try:
             failures = int(await redis.eval(_INCREMENT_LOGIN_FAILURE, 1, failure_key, LOGIN_WINDOW_SECONDS))
         except RedisError:
+            emit_event(auth_logger, "auth.login_limiter.unavailable")
             raise HTTPException(503, "Sign-in is temporarily unavailable. Please try again shortly.") from None
         if failures > MAX_LOGIN_FAILURES:
             raise HTTPException(429, "Too many sign-in attempts. Wait 15 minutes and try again.")

@@ -8,12 +8,12 @@ ClipForge is still a local-development application. This milestone begins with a
 
 | Area | Current implementation | Production gate |
 | --- | --- | --- |
-| Network exposure | Compose binds PostgreSQL and Redis to loopback; API and frontend run separately for local development. | Define private network boundaries, ingress/TLS, firewall rules, and trusted proxy behavior before deployment. |
+| Network exposure | Compose binds PostgreSQL and Redis to loopback; API and frontend run separately for local development. A production-oriented Uvicorn entry point reads explicit trusted proxy IPs/CIDRs and disables query-string-bearing access logs. | Choose and document ingress/TLS, firewall rules, and the exact proxy addresses before deployment; run the API with `python -m app.server`. |
 | Database and queue | PostgreSQL and Redis are persistent Compose services with health checks. | Define encrypted backups, retention, restore objectives, monitoring, upgrades, and Redis recovery behavior. Test restore from a backup before launch. |
 | Media storage | Local filesystem storage with upload, duration, aggregate storage, render size, and retention limits. | Choose storage region/provider, encryption and access policy, capacity alerts, backup scope, deletion guarantees, and lifecycle cleanup verification. |
-| Accounts | Local owner/editor/reviewer roles, hashed passwords and session verifiers, CSRF checks, invite-only enrollment, and shared Redis failed-login throttling. | Add verified email, password recovery, MFA policy, trusted proxy rules, rate-limit alerting, audit events, TLS-only cookies, session operations, and independent security review. See [Milestone 6](milestone-6-accounts-and-collaboration.md). |
+| Accounts | Local owner/editor/reviewer roles, hashed passwords and session verifiers, CSRF checks, invite-only enrollment, and shared Redis failed-login throttling. Throttle and limiter-outage events are logged without address, email, or credential fields. | Add verified email, password recovery, MFA policy, deployment-specific proxy addresses, alert routing, audit events, TLS-only cookies, session operations, and independent security review. See [Milestone 6](milestone-6-accounts-and-collaboration.md). |
 | Job processing | API and worker code process CPU-intensive jobs and call FFmpeg/faster-whisper. | Set measured concurrency, CPU/memory/disk quotas, job timeouts, queue limits, retry policy, cancellation behavior, and worker isolation based on representative workloads. |
-| Observability | Health and dependency-readiness endpoints exist. Request completion and selected worker lifecycle events are JSON logged; requests receive a server-generated correlation ID. A local operations runbook is present. | Add centralized redaction for exception traces, job-level metrics, alerting, and error ownership. Do not log credentials, session tokens, source URLs with secrets, or transcript/media content. |
+| Observability | Health and dependency-readiness endpoints exist. Request completion and selected worker lifecycle events are JSON logged; requests receive a server-generated correlation ID. Application recovery paths log only exception classes, not exception messages or tracebacks. A local operations runbook is present. | Configure framework/process log redaction, job-level metrics, alert routing, log access/retention, and error ownership. Do not log credentials, session tokens, source URLs with secrets, or transcript/media content. |
 | Privacy and operations | Source retention defaults to seven days; local deletion controls exist. | Publish data processing, rights, retention, deletion, privacy, terms, acceptable-use, and support information. Define incident response and user-request handling. |
 
 Local PostgreSQL backup and restore-check commands are available in `scripts/db-backup.sh` and `scripts/db-restore-check.sh`. The archive is custom-format PostgreSQL data, includes account/project records, is not encrypted by these scripts, and excludes local media, model files, and render outputs. It is a local restore drill aid, not a production backup service.
@@ -22,7 +22,7 @@ Setting `APP_ENV=production` now fails startup unless the application has an exp
 
 GitHub CI defines frontend typecheck/build and npm audit, backend syntax compilation and pip-audit, and high/critical vulnerability scans of the PostgreSQL and Redis Compose images. The jobs passed on the draft PR on 4 November 2026. Dependabot is configured for npm, pip, Compose images, and GitHub Actions. Keep scheduled CI enabled and review future findings.
 
-The source-level security review and local runbook are recorded in `security-review-2026-11-04.md` and `local-operations-runbook.md`. They describe local controls and open review items; neither is a production sign-off.
+The source-level security review and local runbook are recorded in `security-review-2026-11-04.md` and `local-operations-runbook.md`. The [internal launch policy brief](launch-policy-brief.md) captures verified local data flows and the choices a reviewer needs. These documents describe local controls and open review items; none is a production sign-off or a public policy.
 
 ## Acceptance gates
 
@@ -38,6 +38,7 @@ The source-level security review and local runbook are recorded in `security-rev
 ## Safe work that can proceed before deployment choices
 
 - Extend request/job events with centralized exception redaction, metrics, and alert routing.
+- Start the API with `python -m app.server`; configure `TRUSTED_PROXY_IPS` to the exact proxy IPs/CIDRs when deployed behind a proxy. Never trust arbitrary forwarded headers.
 - Run the local restore-check command against a fresh database archive and record the restored migration revision; define encrypted production backup and media restore separately.
 - Measure resource consumption and job durations using permission-cleared samples.
 - Resolve or document findings from the CI dependency and container-image scans.

@@ -2,6 +2,8 @@
 
 This runbook applies to the single-machine development setup only. It is not a deployment runbook and does not establish production recovery targets.
 
+For a deployment-oriented API process, use `python -m app.server` from `backend/`. Set `HOST`/`PORT` for the private application interface and `TRUSTED_PROXY_IPS` to the exact proxy IPs/CIDRs. It trusts loopback by default and disables Uvicorn access logs, whose default path can include query strings. Do not expose the development Compose services or assume this command alone makes the system production-ready.
+
 ## Start and check services
 
 1. Start Docker Desktop.

@@ -55,7 +55,7 @@ This was one generated English voice sample, not representative creator media. I
 
 - The latest remote PR CI run passed frontend build/audit, backend compile/audit, and both image scans. Keep these checks enabled and review future failures.
 - The dependency/image audits describe the state on this date and should be repeated. The Trivy YAML ignore format is experimental. Trivy did not identify the stock image's `gosu`/`moby/sys/user` call-path finding; the custom Compose image now runs govulncheck against pinned source and final binary during build.
-- Request/job events do not yet provide exception redaction, metrics, alert routing, or a deployment runbook.
+- Request/job events still lack metrics and alert routing. Application recovery paths now log exception classes without exception text/tracebacks and the deployment-oriented Uvicorn entry point disables query-string-bearing access logs; centrally redacting/routing all framework and process logs remains unconfigured.
 - No user-provided representative media, human candidate ratings, browser/editor review, production target platform decisions, or external security assessment were available for this validation.
 
 - Repeated the local PostgreSQL backup/restore drill against the active development database: a private temporary archive restored into a disposable database at Alembic revision `0009_accounts_and_teams`; the restore script dropped the disposable database and the temporary archive was removed.
