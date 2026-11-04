@@ -24,6 +24,21 @@ YouTube URL references are stored with projects, but YouTube video bytes are not
 
 Target setup: Apple Silicon Mac with 16 GB unified memory, Node.js 22, Python 3.12, Docker Desktop, and FFmpeg/ffprobe. The worker defaults to faster-whisper `small` on CPU with int8 compute and one worker process. The provided backend configuration pins the model revision and PyAV version. Model weights are downloaded into `data/models/` on the first transcription request, not during setup.
 
+## Quick local try (Docker)
+
+Docker runs PostgreSQL, Redis, the API, the transcription worker, and the frontend together. From the repository root:
+
+```sh
+docker compose up -d --build
+docker compose ps
+```
+
+Wait for the API and frontend to report healthy, then open `http://localhost:3000`. The first visit creates the local workspace owner. Create a project, save a YouTube URL as a reference if useful, and upload a source video file you own or have permission to process. A URL alone does not provide video bytes to the clip workflow. The first transcription downloads the pinned speech model and can take a few minutes.
+
+To stop the app while keeping projects and uploads, run `docker compose down`. This local setup binds the app and database ports to loopback; keep it on this computer.
+
+## Manual host development
+
 Install Node and Python with Homebrew if needed:
 
 ```sh
