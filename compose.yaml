@@ -43,6 +43,7 @@ services:
     command: ["alembic", "upgrade", "head"]
     environment: &local-backend-environment
       APP_ENV: development
+      ALLOW_GUEST_SESSIONS: "true"
       HOST: 0.0.0.0
       DATABASE_URL: ${DATABASE_URL:-postgresql://clipforge:clipforge_local_only@postgres:5432/clipforge}
       REDIS_URL: redis://redis:6379/0

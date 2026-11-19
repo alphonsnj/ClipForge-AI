@@ -16,6 +16,8 @@ Projects belong to a team. Every project, source preview, transcription, candida
 
 ## Session and password handling
 
+- Local Compose enables a no-email guest trial that creates a private user/team/session and then uses the same project membership and CSRF checks as account sessions. Creation is rate-limited to five guest workspaces per peer IP per hour. The API refuses guest sessions in production even if the environment flag is accidentally enabled; hosted Compose sets `ALLOW_GUEST_SESSIONS=false`. Guest access expires with its 14-day session and cannot be recovered after the browser loses its cookie, so users should download outputs before signing out. Guest sessions cannot change passwords, create teams, or invite members.
+
 - Passwords require 12–128 characters and are stored using salted `scrypt` hashes (`N=32768`, `r=8`, `p=1`); passwords are never stored or logged in plaintext.
 - Opaque, random session tokens are held in `HttpOnly` cookies; only SHA-256 token verifiers are stored in PostgreSQL. Sessions expire after 14 days. Password changes revoke the account's old sessions and issue a fresh one.
 - Mutating browser requests require an allowed `Origin`, a separate CSRF cookie, and a matching `X-CSRF-Token` header verified against the session record. CORS allows credentials only for the configured frontend origins.
@@ -32,4 +34,4 @@ Apply `0009_accounts_and_teams` with `alembic upgrade head`, then restart API an
 
 ## Not yet implemented
 
-There is no email delivery or email ownership verification, forgotten-password recovery, MFA, account deletion, external identity provider, invitation revocation, or security audit log. Deployment-specific trusted proxy addresses, rate-limit alert routing, production TLS/session-key operations, and independent security review remain required before any public or shared deployment. These remain Milestone 7 security and production-readiness work.
+There is no email delivery or email ownership verification, hosted forgotten-password recovery, MFA, account deletion, external identity provider, invitation revocation, or security audit log. Local password recovery is available only through the private-terminal `python -m app.reset_password` command, which updates the password hash and revokes existing sessions. Deployment-specific trusted proxy addresses, rate-limit alert routing, production TLS/session-key operations, and independent security review remain required before any public or shared deployment.

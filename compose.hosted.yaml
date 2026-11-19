@@ -2,6 +2,7 @@ name: clipforge-hosted
 
 x-backend-environment: &backend-environment
   APP_ENV: production
+  ALLOW_GUEST_SESSIONS: "false"
   DATABASE_URL: ${DATABASE_URL:?set a URL-encoded PostgreSQL URL}
   REDIS_URL: redis://redis:6379/0
   FRONTEND_BASE_URL: https://${CLIPFORGE_HOSTNAME:?set the public hostname}

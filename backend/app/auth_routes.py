@@ -93,9 +93,18 @@ async def _new_session(db: AsyncSession, user: User, response: Response) -> str:
     return csrf
 
 
+def _is_guest_user(user: User) -> bool:
+    return user.email.endswith("@guest.clipforge.local")
+
+
+def _require_registered_account(user: User) -> None:
+    if _is_guest_user(user):
+        raise HTTPException(403, "This action is available after signing in with an account.")
+
+
 async def _account_payload(db: AsyncSession, user: User, csrf: str) -> dict[str, object]:
     rows = await db.execute(select(Team, TeamMembership.role).join(TeamMembership, TeamMembership.team_id == Team.id).where(TeamMembership.user_id == user.id).order_by(Team.name))
-    return {"user": {"id": str(user.id), "email": user.email},
+    return {"user": {"id": str(user.id), "email": user.email, "is_guest": _is_guest_user(user)},
             "teams": [{"id": str(team.id), "name": team.name, "role": role} for team, role in rows.all()],
             "csrf_token": csrf}
 
@@ -123,10 +132,44 @@ async def _check_login_rate(redis: Redis, key: str) -> None:
 
 @router.get("/api/auth/status")
 async def auth_status(session: Session) -> dict[str, bool]:
+    allow_guest = os.getenv("APP_ENV", "development").strip().lower() != "production" and os.getenv("ALLOW_GUEST_SESSIONS", "false").strip().lower() == "true"
     if os.getenv("APP_ENV", "development").strip().lower() == "production":
-        return {"needs_setup": False}
+        return {"needs_setup": False, "allow_guest": False}
     count = await session.scalar(select(func.count(User.id)))
-    return {"needs_setup": int(count or 0) == 0}
+    return {"needs_setup": int(count or 0) == 0, "allow_guest": allow_guest}
+
+
+@router.post("/api/auth/guest", status_code=status.HTTP_201_CREATED)
+async def create_guest_session(request: Request, response: Response, session: Session) -> dict[str, object]:
+    """Create a private, local-only guest workspace for trying the product."""
+    enforce_same_origin(request)
+    if os.getenv("APP_ENV", "development").strip().lower() == "production" or os.getenv("ALLOW_GUEST_SESSIONS", "false").strip().lower() != "true":
+        raise HTTPException(404, "Guest workspaces are not enabled.")
+
+    address = request.client.host if request.client else "unknown"
+    secret = os.getenv("LOGIN_RATE_LIMIT_HASH_KEY", "clipforge-development-only-login-rate-key-change-before-deployment").encode("utf-8")
+    address_digest = hmac.new(secret, address.encode("utf-8"), hashlib.sha256).hexdigest()
+    redis: Redis = request.app.state.redis
+    key = f"clipforge:auth:guest-sessions:{address_digest}"
+    try:
+        attempts = await redis.incr(key)
+        if attempts == 1:
+            await redis.expire(key, 3600)
+    except RedisError:
+        emit_event(auth_logger, "auth.guest_limiter.unavailable")
+        raise HTTPException(503, "Free trial is temporarily unavailable. Please try again shortly.") from None
+    if attempts > 5:
+        raise HTTPException(429, "Too many guest workspaces were created. Try again in an hour.")
+
+    guest_id = secrets.token_urlsafe(18)
+    user = User(email=f"guest+{guest_id}@guest.clipforge.local", password_hash=await asyncio.to_thread(hash_password, secrets.token_urlsafe(48)))
+    team = Team(name="My trial workspace")
+    session.add_all([user, team])
+    await session.flush()
+    session.add(TeamMembership(team_id=team.id, user_id=user.id, role="owner"))
+    csrf = await _new_session(session, user, response)
+    await session.commit()
+    return await _account_payload(session, user, csrf)
 
 
 @router.post("/api/auth/register", status_code=status.HTTP_201_CREATED)
@@ -231,6 +274,7 @@ async def accept_invitation(payload: InvitationAccept, request: Request, respons
 @router.post("/api/auth/password")
 async def change_password(payload: PasswordChange, request: Request, response: Response, context: ContextDep) -> dict[str, object]:
     enforce_csrf(request, context)
+    _require_registered_account(context.user)
     if not await asyncio.to_thread(verify_password, payload.current_password, context.user.password_hash):
         raise HTTPException(401, "Current password is incorrect.")
     context.user.password_hash = await asyncio.to_thread(hash_password, payload.new_password)
@@ -251,6 +295,7 @@ async def list_team_members(team_id: UUID, session: Session, user: UserDep) -> l
 
 @team_router.post("", status_code=status.HTTP_201_CREATED)
 async def create_team(payload: TeamCreate, session: Session, user: UserDep) -> dict[str, object]:
+    _require_registered_account(user)
     name = " ".join(payload.name.split())
     if not name:
         raise HTTPException(422, "Workspace name cannot be blank.")
@@ -264,6 +309,7 @@ async def create_team(payload: TeamCreate, session: Session, user: UserDep) -> d
 
 @team_router.post("/{team_id}/invitations", status_code=201)
 async def create_invitation(team_id: UUID, payload: TeamInvitationCreate, session: Session, user: UserDep) -> dict[str, object]:
+    _require_registered_account(user)
     await require_owner(session, team_id, user.id)
     email = normalize_email(payload.email)
     existing_user = await session.scalar(select(TeamMembership.id).join(User, User.id == TeamMembership.user_id).where(TeamMembership.team_id == team_id, User.email == email))
@@ -279,6 +325,7 @@ async def create_invitation(team_id: UUID, payload: TeamInvitationCreate, sessio
 
 @team_router.delete("/{team_id}/members/{membership_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_team_member(team_id: UUID, membership_id: UUID, session: Session, user: UserDep) -> Response:
+    _require_registered_account(user)
     await require_owner(session, team_id, user.id)
     member = await session.scalar(select(TeamMembership).where(TeamMembership.id == membership_id, TeamMembership.team_id == team_id).with_for_update())
     if member is None:

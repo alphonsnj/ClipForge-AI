@@ -1,6 +1,23 @@
 # ClipForge AI
 
-ClipForge AI is a local-first product for turning long-form video into reviewable short-form clips. Milestones 0–6 are implemented for local development. The current milestone is production-readiness work; the app is not deployed for shared or public use.
+**[Try ClipForge on your computer](#try-it-locally)** · [How it works](#how-it-works) · [Project roadmap](docs/implementation-roadmap.md)
+
+ClipForge AI turns a long video file you own or are allowed to process into a reviewable short-form clip. It transcribes speech, suggests transcript-aligned moments, and lets you edit a clip before rendering an MP4 with its original audio. Captions are available as a separate SRT download, not burned into the video. Every rendered clip is at least 60 seconds long.
+
+ClipForge does not fetch video from YouTube URLs, generate pictures, or claim that a clip will trend. A YouTube URL can be saved as a project reference; to make clips, upload the authorized MP4 or MOV file. Suggested moments are chronological and need a human to choose what works.
+
+> **Trying it:** there is no public hosted demo yet. The link above explains how to run the app locally, then use **Try it without signing in** to open a guest workspace. A shareable live link will require a real deployment; `localhost` links work only on the computer running ClipForge.
+
+## How it works
+
+1. Create a project and optionally save a YouTube URL as a reference.
+2. Upload an MP4 or MOV file that you own or have permission to process.
+3. ClipForge extracts the audio and a background worker transcribes it with faster-whisper. Job state and timestamped transcript segments are stored in PostgreSQL.
+4. Review suggested moments aligned with the transcript. The suggestions are not viral scores or guarantees of performance.
+5. Adjust the clip’s start/end points, title, framing, focus, and transcript text in the editor. The rendered clip must be at least 60 seconds.
+6. Render and preview the MP4 with its original sound. Download the MP4 and, if needed, its separate SRT captions file.
+
+The local app uses a Next.js frontend, a FastAPI backend, PostgreSQL for project and job data, Redis to wake the worker, and FFmpeg plus faster-whisper for media processing. The implementation roadmap and milestone notes document what is complete and what remains.
 
 ## Current milestone: production readiness
 
@@ -34,7 +51,7 @@ docker compose up -d --build
 docker compose ps
 ```
 
-Wait for the API and frontend to report healthy, then open `http://localhost:3000`. The first visit creates the local workspace owner. Create a project, save a YouTube URL as a reference if useful, and upload a source video file you own or have permission to process. A URL alone does not provide video bytes to the clip workflow. The first transcription downloads the pinned speech model and can take a few minutes.
+Wait for the API and frontend to report healthy, then open `http://localhost:3000`. Choose **Try it without signing in** to create a private, local guest workspace, or set up/sign into an account. Guest access is enabled only in the loopback-bound local Compose setup; hosted Compose disables it. Guest workspaces use the same project isolation, CSRF checks, and rate limits as account sessions, but cannot be recovered if the browser session is lost. Download anything you want to keep before signing out. Create a project, save a YouTube URL as a reference if useful, and upload a source video file you own or have permission to process. A URL alone does not provide video bytes to the clip workflow. The first transcription downloads the pinned speech model and can take a few minutes.
 
 To stop the app while keeping projects and uploads, run `docker compose down`. This local setup binds the app and database ports to loopback; keep it on this computer.
 
@@ -89,7 +106,7 @@ python -m app.worker
 
 Open `http://localhost:3000`. Create a project at `http://localhost:3000/workspace`. Intake accepts MP4/MOV, up to 500 MB, one hour long, with a 2 GB total local-media quota and one concurrent upload per API process. Sources are kept in the private `data/media/` directory and deleted after seven days; users can also delete a source or project sooner. You must affirm ownership or permission for each upload. Start one transcription worker only; it serializes model work for the 16 GB local target. The first transcription downloads the model weights, so allow time and disk space for that step. Liveness is available at `http://localhost:8000/health`; readiness checks PostgreSQL and Redis at `http://localhost:8000/health/ready`.
 
-The first visit creates the initial workspace owner account. Additional people join through manually copied, 24-hour invitation links. Owners manage invitations; editors can make projects; reviewers can read and preview without changing project state. Run `alembic upgrade head` before opening the workspace. See [Milestone 6 account and role details](docs/milestone-6-accounts-and-collaboration.md).
+For account-based work, create the initial workspace owner account. Additional people join through manually copied, 24-hour invitation links. Owners manage invitations; editors can make projects; reviewers can read and preview without changing project state. Run `alembic upgrade head` before opening the workspace. See [Milestone 6 account and role details](docs/milestone-6-accounts-and-collaboration.md).
 
 Transcription jobs and transcript rows are durable in PostgreSQL. Redis wakes the worker, while PostgreSQL polling recovers queued jobs if Redis loses a notification. Completed transcript segments include start/end millisecond timestamps and detected language. Candidate runs preserve source boundaries and transcript excerpts, and record creator selection, rejection, and edits. They do not assign quality scores or estimate virality. A synthetic English transcription smoke passed; representative-language benchmarks and human candidate evaluation remain open. Keep target-language evaluation recordings permission-cleared and outside Git. See [Milestone 2 notes](docs/milestone-2-transcription.md), [Milestone 3 notes](docs/milestone-3-candidates.md), and the [validation log](docs/validation-log.md).
 

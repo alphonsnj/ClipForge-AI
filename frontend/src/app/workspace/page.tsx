@@ -112,7 +112,7 @@ function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Res
   return fetch(input, { ...init, credentials: "include", headers });
 }
 
-type Account = { id: string; email: string };
+type Account = { id: string; email: string; is_guest?: boolean };
 type TeamAccount = { id: string; name: string; role: "owner" | "editor" | "reviewer" };
 type TeamMember = { email: string; role: string; membership_id: string };
 
@@ -333,11 +333,13 @@ export default function WorkspacePage() {
   const [selectedTeamId, setSelectedTeamId] = useState("");
   const [authLoading, setAuthLoading] = useState(true);
   const [setupRequired, setSetupRequired] = useState(false);
+  const [guestEnabled, setGuestEnabled] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register" | "accept">("login");
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [inviteToken, setInviteToken] = useState("");
   const [authError, setAuthError] = useState("");
+  const [authHelp, setAuthHelp] = useState<"forgot" | "create" | null>(null);
   const [authBusy, setAuthBusy] = useState(false);
   const [teamMembers, setTeamMembers] = useState<Record<string, TeamMember[]>>({});
   const [inviteEmail, setInviteEmail] = useState("");
@@ -367,6 +369,7 @@ export default function WorkspacePage() {
         const statusData = await statusResponse.json();
         if (!active) return;
         setSetupRequired(statusData.needs_setup);
+        setGuestEnabled(statusData.allow_guest === true);
         setAuthMode(statusData.needs_setup ? "register" : invite ? "accept" : "login");
         if (!statusData.needs_setup) {
           const response = await apiFetch(`${API}/api/auth/me`, { cache: "no-store" });
@@ -733,6 +736,16 @@ export default function WorkspacePage() {
     finally { setAuthBusy(false); }
   }
 
+  async function startGuestTrial() {
+    setAuthBusy(true); setAuthError("");
+    try {
+      const response = await apiFetch(`${API}/api/auth/guest`, { method: "POST" });
+      if (!response.ok) throw new Error(await responseError(response));
+      const data = await response.json(); csrfToken = data.csrf_token; setAccount(data.user); setTeams(data.teams); setSelectedTeamId(data.teams[0]?.id ?? "");
+    } catch (reason) { setAuthError(reason instanceof Error ? reason.message : "The free trial could not be started."); }
+    finally { setAuthBusy(false); }
+  }
+
   async function signOut() {
     try { await apiFetch(`${API}/api/auth/logout`, { method: "POST" }); } finally {
       csrfToken = ""; setAccount(null); setTeams([]); setProjects([]); setTeamMembers({});
@@ -797,12 +810,16 @@ export default function WorkspacePage() {
     <section className="auth-card"><p className="workspace-eyebrow"><span /> PRIVATE WORKSPACE</p>
       <h1>{authMode === "register" ? "Set up your" : authMode === "accept" ? "Join the" : "Welcome"}<br /><em>{authMode === "accept" ? "team." : "workspace."}</em></h1>
       <p>{authMode === "register" ? "Create your account. Your personal workspace is set up automatically; you can invite people later if you need to." : authMode === "accept" ? "Use the invited email and either create its password or confirm your existing password." : "Sign in to open your workspace and projects."}</p>
+      {guestEnabled && <div className="guest-trial"><strong>Try ClipForge free</strong><p>Start a private guest workspace without an email or password. Download anything you want to keep before signing out; guest access can’t be recovered if this browser session is lost.</p><button type="button" onClick={() => void startGuestTrial()} disabled={authBusy}>{authBusy ? "Starting trial…" : "Try it without signing in"}<span aria-hidden="true">↗</span></button></div>}
       <form onSubmit={(event) => void submitAuth(event)}>
         <label>Email<input type="email" autoComplete="email" required maxLength={320} value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} /></label>
         <label>Password<input type="password" autoComplete={authMode === "login" ? "current-password" : "new-password"} minLength={12} maxLength={128} required value={authPassword} onChange={(event) => setAuthPassword(event.target.value)} /></label>
         <button type="submit" disabled={authBusy}>{authBusy ? "Please wait…" : authMode === "register" ? "Create owner account" : authMode === "accept" ? "Accept invitation" : "Sign in"}<span aria-hidden="true">↗</span></button>
       </form>
       {authError && <p className="workspace-error" role="alert">{authError}</p>}
+      {!setupRequired && authMode === "login" && authHelp === "forgot" && <aside className="auth-help" role="status"><strong>Recover your local account</strong><p>Email reset is not configured for this local app. From the ClipForge project folder, run <code>docker compose exec -it api python -m app.reset_password</code>, then follow the terminal prompts. This updates the password hash and signs out existing sessions.</p></aside>}
+      {!setupRequired && authMode === "login" && authHelp === "create" && <aside className="auth-help" role="status"><strong>Create an account</strong><p>This workspace is invite-only after the owner account is created. Ask the workspace owner for an invitation link, then open it here to create your account. Open self-registration is disabled to protect private projects.</p></aside>}
+      {!setupRequired && authMode === "login" && <div className="auth-help-actions"><button className="auth-switch" type="button" onClick={() => setAuthHelp((value) => value === "forgot" ? null : "forgot")}>Forgot password?</button><button className="auth-switch" type="button" onClick={() => setAuthHelp((value) => value === "create" ? null : "create")}>Create an account</button></div>}
       {setupRequired && authMode !== "register" && <button className="auth-switch" type="button" onClick={() => setAuthMode("register")}>Set up the first owner account</button>}
       {!setupRequired && authMode === "login" && inviteToken && <button className="auth-switch" type="button" onClick={() => setAuthMode("accept")}>Accept workspace invitation</button>}
       {authMode === "accept" && <button className="auth-switch" type="button" onClick={() => { setInviteToken(""); setAuthMode("login"); }}>Return to sign in</button>}
@@ -818,11 +835,13 @@ export default function WorkspacePage() {
         <Link className="workspace-back" href="/">Back to the story <span aria-hidden="true">↗</span></Link>
       </header>
 
-      <section className="account-bar" aria-label="Signed-in account"><div><span className="panel-kicker">SIGNED IN</span><strong>{account.email}</strong><span>{teams.map((team) => `${team.name} · ${team.role}`).join("  /  ")}</span></div><div><button type="button" onClick={() => setPasswordChangeOpen((value) => !value)}>Change password</button><button type="button" onClick={() => void signOut()}>Sign out</button></div>
-        {passwordChangeOpen && <form className="password-change" onSubmit={(event) => void changePassword(event)}><label>Current password<input name="current-password" type="password" autoComplete="current-password" required /></label><label>New password<input name="new-password" type="password" autoComplete="new-password" minLength={12} maxLength={128} required /></label><button type="submit">Update password</button></form>}
+      <section className="account-bar" aria-label={account.is_guest ? "Guest trial" : "Signed-in account"}><div><span className="panel-kicker">{account.is_guest ? "GUEST TRIAL" : "SIGNED IN"}</span><strong>{account.is_guest ? "Free trial workspace" : account.email}</strong><span>{teams.map((team) => `${team.name} · ${team.role}`).join("  /  ")}</span></div><div>{!account.is_guest && <button type="button" onClick={() => setPasswordChangeOpen((value) => !value)}>Change password</button>}<button type="button" onClick={() => void signOut()}>Sign out</button></div>
+        {passwordChangeOpen && !account.is_guest && <form className="password-change" onSubmit={(event) => void changePassword(event)}><label>Current password<input name="current-password" type="password" autoComplete="current-password" required /></label><label>New password<input name="new-password" type="password" autoComplete="new-password" minLength={12} maxLength={128} required /></label><button type="submit">Update password</button></form>}
       </section>
 
-      <details className="workspace-settings">
+      {account.is_guest && <p className="guest-session-note" role="note">You’re using a guest workspace. Your access is kept in this browser’s session cookie for up to 14 days. Download videos you want to keep; losing the session means this guest workspace can’t be recovered.</p>}
+
+      {!account.is_guest && <details className="workspace-settings">
         <summary>Optional workspace settings <span>IDs, extra spaces, and invitations</span></summary>
         <div className="workspace-settings-content">
           {teams.map((team) => <section className="team-panel" key={team.id} aria-label={`${team.name} access`}>
@@ -837,7 +856,7 @@ export default function WorkspacePage() {
           </section>)}
           <form className="create-team-form" onSubmit={(event) => void createTeam(event)}><label>Workspace name<input value={newTeamName} onChange={(event) => setNewTeamName(event.target.value)} maxLength={120} required placeholder="Name another workspace" /></label><button type="submit">Create workspace</button>{teamCreateError && <p role="alert">{teamCreateError}</p>}<p className="workspace-create-note">A unique ID and matching icon are generated automatically.</p></form>
         </div>
-      </details>
+      </details>}
 
       <section className="workspace-intro">
         <p className="workspace-eyebrow"><span /> YOUR CREATOR SPACE</p>
