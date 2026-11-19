@@ -322,7 +322,7 @@ class RenderJob(Base):
     aspect_ratio: Mapped[str] = mapped_column(String(8), nullable=False, default="9:16")
     output_width: Mapped[int] = mapped_column(Integer, nullable=False, default=720)
     output_height: Mapped[int] = mapped_column(Integer, nullable=False, default=1280)
-    caption_mode: Mapped[str] = mapped_column(String(16), nullable=False, default="burn_in")
+    caption_mode: Mapped[str] = mapped_column(String(16), nullable=False, default="sidecar")
     crop_mode: Mapped[str] = mapped_column(String(16), nullable=False, default="fit_blur")
     focus_x: Mapped[float] = mapped_column(Float, nullable=False, default=0.5)
     focus_y: Mapped[float] = mapped_column(Float, nullable=False, default=0.5)

@@ -194,7 +194,7 @@ class HighlightCandidateRead(BaseModel):
 
 class RenderJobCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    caption_mode: Literal["burn_in", "sidecar"] = "burn_in"
+    caption_mode: Literal["burn_in", "sidecar"] = "sidecar"
 
 
 class RenderJobRead(BaseModel):

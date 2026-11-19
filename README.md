@@ -15,6 +15,7 @@ ClipForge AI is a local-first product for turning long-form video into reviewabl
 - Job status, retry, cancellation, language detection, and transcript inspection in the workspace
 - Transcript-aligned candidate windows with duration controls, factual boundary signals, creator edits, and select/reject review
 - Durable creator-triggered render jobs with bounded private MP4/SRT storage, cancellation/retry, progress, preview, and downloads
+- Every new MP4 export is at least 60 seconds long; the local maximum defaults to 180 seconds
 - Autosaved timeline/title edits, transcript caption corrections, local output presets, crop mode, and focus controls
 - Local account setup/sign-in, project ownership by team, owner/editor/reviewer roles, one-time invitations, password changes, and session/CSRF checks
 

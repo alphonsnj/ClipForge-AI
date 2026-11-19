@@ -49,3 +49,7 @@
 .candidate-advanced-grid{display:grid;grid-template-columns:repeat(3,minmax(70px,1fr));gap:8px;margin-top:10px}
 .candidate-options>button{grid-column:2;grid-row:1;min-height:38px;border-radius:7px;background:#294b38;color:white}
 @media(max-width:650px){.candidate-options{grid-template-columns:1fr}.candidate-advanced-grid{grid-template-columns:1fr 1fr}.candidate-options>button{grid-column:1;grid-row:auto;width:100%}}
+.download-source{flex:none;border:1px solid #b8c5af;border-radius:7px;padding:7px 9px;color:#294b38;font-size:9px;text-decoration:none;white-space:nowrap}.download-source:hover{background:#f7f8f3}
+@media(max-width:650px){.download-source{font-size:8px;padding:6px}}
+.editor-heading-actions{display:flex;align-items:center;gap:.55rem}.editor-heading-actions button{border:0;border-radius:8px;background:#294b38;color:white;padding:.55rem .75rem;font:inherit;cursor:pointer}.editor-heading-actions button:disabled{opacity:.5;cursor:not-allowed}
+@media(max-width:600px){.editor-heading-actions{align-items:flex-end;flex-direction:column}}

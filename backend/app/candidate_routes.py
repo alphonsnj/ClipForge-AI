@@ -62,7 +62,7 @@ async def create_candidate_run(
     if not drafts:
         raise HTTPException(
             422,
-            "No transcript-aligned complete-sentence windows fit that duration range. Try a wider range or review the transcript punctuation.",
+            "No transcript-aligned complete-sentence windows fit that duration range. Keep the minimum at 60 seconds, try a longer maximum, or review the transcript punctuation.",
         )
 
     run = CandidateRun(

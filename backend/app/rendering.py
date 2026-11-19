@@ -19,6 +19,7 @@ if not OUTPUT_DIR.is_absolute():
     OUTPUT_DIR = (ROOT / OUTPUT_DIR).resolve()
 MAX_RENDER_STORAGE_BYTES = int(os.getenv("MAX_RENDER_STORAGE_BYTES", str(2 * 1024 * 1024 * 1024)))
 MAX_RENDER_FILE_BYTES = int(os.getenv("MAX_RENDER_FILE_BYTES", str(500 * 1024 * 1024)))
+MIN_RENDER_DURATION_SECONDS = 60
 MAX_RENDER_DURATION_SECONDS = int(os.getenv("MAX_RENDER_DURATION_SECONDS", "180"))
 RENDER_TIMEOUT_SECONDS = int(os.getenv("RENDER_TIMEOUT_SECONDS", "900"))
 FFMPEG_BINARY = os.getenv("FFMPEG_BINARY", "ffmpeg")
@@ -43,6 +44,8 @@ if min(
     RENDER_TIMEOUT_SECONDS,
 ) <= 0:
     raise ValueError("Render storage, file, duration, and timeout limits must be positive.")
+if MAX_RENDER_DURATION_SECONDS < MIN_RENDER_DURATION_SECONDS:
+    raise ValueError("MAX_RENDER_DURATION_SECONDS cannot be less than 60 seconds.")
 
 
 class RenderFailure(Exception):
@@ -260,6 +263,8 @@ def probe_render(path: Path, width: int = FRAME_WIDTH, height: int = FRAME_HEIGH
         or video.get("height") != height
     ):
         raise RenderFailure("invalid_render", "The rendered file did not match the portrait draft preset.")
+    if duration < MIN_RENDER_DURATION_SECONDS:
+        raise RenderFailure("render_too_short", "The rendered video is shorter than the 60-second minimum.")
     if size <= 0 or size > MAX_RENDER_FILE_BYTES:
         raise RenderFailure("render_size_limit", "The rendered file exceeded the local per-export size limit.")
     return round(duration * 1000), size

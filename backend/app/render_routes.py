@@ -15,7 +15,7 @@ from .db import get_session
 from .auth import enforce_access
 from .intake import safe_storage_path
 from .models import CandidateRun, HighlightCandidate, RenderJob, Source, utc_now
-from .rendering import (MAX_RENDER_DURATION_SECONDS, MAX_RENDER_FILE_BYTES,
+from .rendering import (MAX_RENDER_DURATION_SECONDS, MIN_RENDER_DURATION_SECONDS, MAX_RENDER_FILE_BYTES,
                         MAX_RENDER_STORAGE_BYTES, OUTPUT_DIR, safe_render_path,
                         unlink_render_key, preset_dimensions)
 from .schemas import RenderJobCreate, RenderJobRead
@@ -41,7 +41,9 @@ async def create_render(candidate_id: UUID, payload: RenderJobCreate, session: S
     if candidate.status not in {"selected", "edited"}:
         raise HTTPException(409, "Select or edit this candidate before rendering.")
     duration = candidate.end_ms - candidate.start_ms
-    if duration <= 0 or duration > MAX_RENDER_DURATION_SECONDS * 1000:
+    if duration < MIN_RENDER_DURATION_SECONDS * 1000:
+        raise HTTPException(422, f"Every exported video must be at least {MIN_RENDER_DURATION_SECONDS} seconds long. Extend the selected range before rendering.")
+    if duration > MAX_RENDER_DURATION_SECONDS * 1000:
         raise HTTPException(422, f"Render duration must be at most {MAX_RENDER_DURATION_SECONDS} seconds.")
     run = candidate.run
     source = await session.scalar(select(Source).where(Source.id == run.source_id, Source.expires_at > utc_now()))

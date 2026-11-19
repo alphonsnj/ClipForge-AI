@@ -180,7 +180,7 @@ async def update_render_job(job: ClaimedRenderJob, *, status: str | None = None,
 
 async def process_render_job(job: ClaimedRenderJob) -> None:
     import shutil
-    from .rendering import (MAX_RENDER_DURATION_SECONDS, OUTPUT_DIR, RenderFailure,
+    from .rendering import (MAX_RENDER_DURATION_SECONDS, MIN_RENDER_DURATION_SECONDS, OUTPUT_DIR, RenderFailure,
                             build_ffmpeg_command, caption_rows, clean_render_directory,
                             prepare_render_directory, probe_render, safe_render_path,
                             write_ass, write_srt)
@@ -209,6 +209,7 @@ async def process_render_job(job: ClaimedRenderJob) -> None:
             caption_edits = render_record.caption_edits or {}
             source_path = safe_storage_path(source.storage_key)
             expiry = source.expires_at
+        if end_ms - start_ms < MIN_RENDER_DURATION_SECONDS * 1000: raise RenderFailure("duration_limit", "Candidate duration is shorter than the 60-second export minimum.")
         if end_ms <= start_ms or end_ms - start_ms > MAX_RENDER_DURATION_SECONDS * 1000: raise RenderFailure("duration_limit", "Candidate duration exceeds the local rendering limit.")
         if not source_path.is_file(): raise RenderFailure("source_missing", "The local source file is missing.")
         if not await update_render_job(job, status="rendering", stage="rendering", progress=1): return

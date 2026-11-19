@@ -4,7 +4,7 @@
 
 - Preview the private source video in a composition-aware canvas with play/pause, a bounded playhead, and transcript-row seeking/highlighting.
 - Edit clip title and in/out points using numeric controls and a compact timeline; changes autosave after a short pause and expose saved, saving, unsaved, or failed state.
-- Correct each transcript segment used as a caption. Corrections are saved against transcript segment IDs, survive refresh, and are used by both the SRT sidecar and burned-in ASS captions. Empty correction text removes that caption row.
+- Correct each transcript segment used as a caption. Corrections are saved against transcript segment IDs, survive refresh, and are used in the separate SRT sidecar; new MP4 renders do not show captions over the video. Empty correction text removes that caption row.
 - Choose a local frame preset: 9:16 portrait 720 × 1280, 1:1 square 720 × 720, or 16:9 landscape 1280 × 720. Choose full-frame fit over blurred background or fill-and-crop; focus sliders adjust crop center. These are provisional local draft presets, not confirmed platform specifications.
 - Render jobs snapshot the range, caption corrections, preset, crop mode, and focus coordinates when queued. Later editor changes do not alter an in-progress or retried render.
 

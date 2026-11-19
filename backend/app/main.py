@@ -86,12 +86,15 @@ async def intake_config(_: User = Depends(current_user)) -> dict[str, object]:
         MAX_VIDEO_DURATION_SECONDS,
         SOURCE_RETENTION_DAYS,
     )
+    from .rendering import MAX_RENDER_DURATION_SECONDS, MIN_RENDER_DURATION_SECONDS
 
     return {
         "accepted_formats": ["mp4", "mov"],
         "max_upload_bytes": MAX_UPLOAD_BYTES,
         "max_media_storage_bytes": MAX_MEDIA_STORAGE_BYTES,
         "max_video_duration_seconds": MAX_VIDEO_DURATION_SECONDS,
+        "min_render_duration_seconds": MIN_RENDER_DURATION_SECONDS,
+        "max_render_duration_seconds": MAX_RENDER_DURATION_SECONDS,
         "source_retention_days": SOURCE_RETENTION_DAYS,
         "youtube_processing": False,
         "access_scope": "authenticated-local-team",

@@ -281,6 +281,30 @@ async def preview_source(project_id: UUID, session: Session) -> FileResponse:
     return FileResponse(path, media_type=content_type, filename=source.original_filename, headers={"Cache-Control": "no-store"})
 
 
+@router.get("/{project_id}/source/download")
+async def download_source(project_id: UUID, session: Session) -> FileResponse:
+    project = await session.scalar(select(Project).options(selectinload(Project.sources)).where(Project.id == project_id))
+    if project is None or not project.sources:
+        raise HTTPException(404, "Project source not found.")
+    source = project.sources[0]
+    if source.expires_at <= utc_now():
+        raise HTTPException(404, "Project source has expired.")
+    try:
+        path = safe_storage_path(source.storage_key)
+    except ValueError:
+        raise HTTPException(404, "Project source is unavailable.") from None
+    if not path.is_file():
+        raise HTTPException(404, "Project source is unavailable.")
+    content_type = "video/quicktime" if source.media_format.lower() == "mov" else "video/mp4"
+    return FileResponse(
+        path,
+        media_type=content_type,
+        filename=source.original_filename,
+        content_disposition_type="attachment",
+        headers={"Cache-Control": "no-store"},
+    )
+
+
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_project(project_id: UUID, session: Session) -> Response:
     project = await session.scalar(

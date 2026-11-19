@@ -95,6 +95,8 @@ type IntakeConfig = {
   max_upload_bytes: number;
   max_media_storage_bytes: number;
   max_video_duration_seconds: number;
+  min_render_duration_seconds: number;
+  max_render_duration_seconds: number;
   source_retention_days: number;
   youtube_processing: boolean;
   access_scope: string;
@@ -200,9 +202,11 @@ function drawEditorPreview(video: HTMLVideoElement, canvas: HTMLCanvasElement, s
   context.drawImage(video, (width - drawWidth) / 2, (height - drawHeight) / 2, drawWidth, drawHeight);
 }
 
-function CreatorEditor({ projectId, transcriptionJobId, sourceDuration, candidate, onSaved, readOnly }: {
+function CreatorEditor({ projectId, transcriptionJobId, sourceDuration, candidate, onSaved, readOnly, minRenderDuration, maxRenderDuration, onRender, renderDisabled }: {
   projectId: string; transcriptionJobId: string; sourceDuration: number;
   candidate: HighlightCandidate; onSaved: () => void; readOnly: boolean;
+  minRenderDuration: number; maxRenderDuration: number;
+  onRender: () => void; renderDisabled: boolean;
 }) {
   const defaultSettings: EditorSettings = { aspect_ratio: "9:16", crop_mode: "fit_blur", focus_x: 0.5, focus_y: 0.5 };
   const [title, setTitle] = useState(candidate.title);
@@ -246,6 +250,7 @@ function CreatorEditor({ projectId, transcriptionJobId, sourceDuration, candidat
     const serialized = JSON.stringify(body);
     if (serialized === savedPayload.current) return;
     setSaveState("Unsaved changes");
+    if (end - start < minRenderDuration || end - start > maxRenderDuration) return;
     const timer = window.setTimeout(async () => {
       setSaveState("Saving…"); setSaveError("");
       try {
@@ -259,7 +264,7 @@ function CreatorEditor({ projectId, transcriptionJobId, sourceDuration, candidat
       }
     }, 700);
     return () => window.clearTimeout(timer);
-  }, [title, start, end, captionEdits, settings, sourceDuration, candidate.id, onSaved, readOnly]);
+  }, [title, start, end, captionEdits, settings, sourceDuration, candidate.id, onSaved, readOnly, minRenderDuration, maxRenderDuration]);
 
   useEffect(() => {
     const video = sourceVideo.current, canvas = previewCanvas.current;
@@ -285,10 +290,10 @@ function CreatorEditor({ projectId, transcriptionJobId, sourceDuration, candidat
 
   const visibleSegments = segments.filter((segment) => segment.start_ms < end * 1000 && segment.end_ms > start * 1000);
   const frameRatio = settings.aspect_ratio === "9:16" ? "9 / 16" : settings.aspect_ratio === "1:1" ? "1 / 1" : "16 / 9";
-  const validRange = start >= 0 && end > start && end <= sourceDuration;
+  const validRange = start >= 0 && end > start && end <= sourceDuration && end - start >= minRenderDuration && end - start <= maxRenderDuration;
   return <section className="creator-editor" aria-label={`Editor for ${candidate.title}`}>
-    <div className="editor-heading"><div><p className="panel-kicker">MILESTONE 05 · CREATOR EDITOR</p><strong>Make the draft yours</strong></div><span role="status">{saveState}</span></div>
-    <div className="editor-preview" style={{ aspectRatio: frameRatio }}><canvas ref={previewCanvas} aria-label={`${settings.aspect_ratio} composition preview for ${candidate.title}`} role="img" /><video ref={sourceVideo} className="editor-source-video" crossOrigin="use-credentials" preload="metadata" muted playsInline src={`${API}/api/projects/${projectId}/source/preview`}
+    <div className="editor-heading"><div><p className="panel-kicker">MILESTONE 05 · CREATOR EDITOR</p><strong>Make the draft yours</strong></div><div className="editor-heading-actions"><span role="status">{saveState}</span>{!readOnly && <button type="button" onClick={onRender} disabled={renderDisabled || !validRange || saveState !== "Saved"} aria-label={`Render ${candidate.title}`}>Render video</button>}</div></div>
+    <div className="editor-preview" style={{ aspectRatio: frameRatio }}><canvas ref={previewCanvas} aria-label={`${settings.aspect_ratio} composition preview for ${candidate.title}`} role="img" /><video ref={sourceVideo} className="editor-source-video" crossOrigin="use-credentials" preload="metadata" playsInline src={`${API}/api/projects/${projectId}/source/preview`}
       onLoadedMetadata={(event) => { event.currentTarget.currentTime = start; }} onLoadedData={(event) => { if (previewCanvas.current) drawEditorPreview(event.currentTarget, previewCanvas.current, settings); }}
       onSeeked={(event) => { if (previewCanvas.current) drawEditorPreview(event.currentTarget, previewCanvas.current, settings); }}
       onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)}
@@ -309,7 +314,7 @@ function CreatorEditor({ projectId, transcriptionJobId, sourceDuration, candidat
         <label>Focus top ↕ bottom<input type="range" min="0" max="1" step="0.01" value={settings.focus_y} disabled={readOnly} onChange={(event) => setSettings((value) => ({ ...value, focus_y: Number(event.target.value) }))} /></label>
       </>}
     </div>
-    {!validRange && <p className="job-failure" role="alert">Set an in and out point inside the source. Autosave resumes when the range is valid.</p>}
+    {!validRange && <p className="job-failure" role="alert">Set an in and out point inside the source with a duration of {minRenderDuration}–{maxRenderDuration} seconds. Autosave and rendering resume when the range is valid.</p>}
     <div className="caption-editor"><p className="panel-kicker">CAPTION CORRECTIONS · AUTOSAVED</p>
       {visibleSegments.map((segment) => <div className={`caption-row ${currentMs >= segment.start_ms && currentMs < segment.end_ms ? "caption-row-active" : ""}`} key={segment.id}>
         <button type="button" onClick={() => setVideoTime(segment.start_ms)} aria-label={`Seek preview to ${formatTimestamp(segment.start_ms)}`}><time>{formatTimestamp(segment.start_ms)}</time></button>
@@ -549,7 +554,7 @@ export default function WorkspacePage() {
     setBusyId(project.id); setError(""); setMessage("");
     try {
       const response = await apiFetch(`${API}/api/candidates/${candidate.id}/renders`, {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ caption_mode: "burn_in" }),
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ caption_mode: "sidecar" }),
       });
       if (!response.ok) throw new Error(await responseError(response));
       setMessage("Local portrait render queued. Keep this workspace open to follow progress.");
@@ -870,13 +875,15 @@ export default function WorkspacePage() {
             const projectRole = teams.find((team) => team.id === project.team_id)?.role ?? "reviewer";
             const canEdit = projectRole === "owner" || projectRole === "editor";
             const isOwner = projectRole === "owner";
+            const minRenderDuration = config?.min_render_duration_seconds ?? 60;
+            const maxRenderDuration = config?.max_render_duration_seconds ?? 180;
             return (
               <article className="project-card" key={project.id}>
                 <div className="project-card-head"><span className="project-number">{(index + 1).toString().padStart(2, "0")}</span><div className="project-name"><h3>{project.name}</h3><span>Created {new Date(project.created_at).toLocaleDateString()} · {projectRole}</span></div>{isOwner && <button className="delete-project" type="button" onClick={() => void removeProject(project)} disabled={busyId === project.id} aria-label={`Delete ${project.name} project`}>Delete project</button>}</div>
                 {project.youtube_url && <div className="youtube-reference"><span>YOUTUBE REFERENCE</span><a href={project.youtube_url} target="_blank" rel="noreferrer">{project.youtube_url}</a>{isOwner && <button type="button" onClick={() => void removeYouTubeReference(project)} disabled={busyId === project.id}>Remove link</button>}<p>This link is stored for reference only. ClipForge does not fetch YouTube video bytes; upload a permitted video file to transcribe it.</p></div>}
                 {source ? (
                   <>
-                    <div className="source-file"><div className="source-file-icon" aria-hidden="true">▧</div><div className="source-file-details"><strong>{source.original_filename}</strong><span>{source.media_format.toUpperCase()} · {formatBytes(source.size_bytes)} · {formatDuration(source.duration_seconds)}</span><span>Auto-delete {new Date(source.expires_at).toLocaleString()}</span></div><span className="source-ready">SOURCE ADDED</span>{isOwner && <button className="delete-source" type="button" onClick={() => void removeSource(project)} disabled={busyId === project.id} aria-label={`Delete source from ${project.name}`}>×</button>}</div>
+                    <div className="source-file"><div className="source-file-icon" aria-hidden="true">▧</div><div className="source-file-details"><strong>{source.original_filename}</strong><span>{source.media_format.toUpperCase()} · {formatBytes(source.size_bytes)} · {formatDuration(source.duration_seconds)}</span><span>Auto-delete {new Date(source.expires_at).toLocaleString()}</span></div><span className="source-ready">SOURCE ADDED</span><a className="download-source" href={`${API}/api/projects/${project.id}/source/download`} download>Download source</a>{isOwner && <button className="delete-source" type="button" onClick={() => void removeSource(project)} disabled={busyId === project.id} aria-label={`Delete source from ${project.name}`}>×</button>}</div>
                     <div className="transcription-panel">
                       <div className="transcription-panel-head">
                         <div><p className="panel-kicker">SPEECH TO TEXT</p><strong>{latestJob ? JOB_STAGE_LABELS[latestJob.stage] ?? latestJob.stage : "Create a timestamped transcript"}</strong></div>
@@ -896,39 +903,40 @@ export default function WorkspacePage() {
                       {latestJob && expandedTranscriptId === latestJob.id && <div className="transcript-segments" aria-live="polite">{transcripts[latestJob.id]?.length ? transcripts[latestJob.id].map((segment) => <p key={segment.id}><time>{formatTimestamp(segment.start_ms)}–{formatTimestamp(segment.end_ms)}</time><span>{segment.text}</span></p>) : <p className="transcript-loading">Loading transcript…</p>}</div>}
                     </div>
                     {latestJob?.status === "complete" && <section className="candidate-panel" aria-label={`Highlight candidates for ${project.name}`}>
-                      <div className="candidate-panel-heading"><div><p className="panel-kicker">MILESTONE 03 · REVIEWABLE MOMENTS</p><strong>Find candidate windows</strong></div><span className="candidate-count">{latestRun ? latestRun.candidates.length.toString().padStart(2, "0") : "—"}</span></div>
-                      <p className="candidate-explainer">Find up to 10 moments between 15 and 60 seconds. Suggestions follow the story in source order; they are not virality predictions.</p>
+                      <div className="candidate-panel-heading"><div><p className="panel-kicker">MILESTONE 03 · REVIEWABLE MOMENTS</p><strong>Find candidate windows</strong></div><span className="candidate-count">{latestRun ? "01" : "—"}</span></div>
+                      <p className="candidate-explainer">Every exported video is at least {minRenderDuration} seconds. Find up to 10 moments from {minRenderDuration} to {Math.min(90, maxRenderDuration)} seconds; longer moments can be adjusted in the editor.</p>
                       {canEdit && <form className="candidate-options" onSubmit={(event) => void createCandidateRun(event, project, latestJob)}>
                         <details className="candidate-advanced">
                           <summary>Adjust clip length or number (optional)</summary>
                           <div className="candidate-advanced-grid">
-                            <label>Minimum seconds<input name="min-duration" type="number" min="1" max="3600" step="1" defaultValue="15" required /></label>
-                            <label>Maximum seconds<input name="max-duration" type="number" min="1" max="3600" step="1" defaultValue="60" required /></label>
+                            <label>Minimum seconds<input name="min-duration" type="number" min={minRenderDuration} max={maxRenderDuration} step="1" defaultValue={minRenderDuration} required /></label>
+                            <label>Maximum seconds<input name="max-duration" type="number" min={minRenderDuration} max={maxRenderDuration} step="1" defaultValue={Math.min(90, maxRenderDuration)} required /></label>
                             <label>Maximum clips<input name="candidate-limit" type="number" min="1" max="100" step="1" defaultValue="10" required /></label>
                           </div>
                         </details>
                         <button type="submit" disabled={busyId === project.id}>{busyId === project.id ? "Finding moments…" : "Find moments"}</button>
                       </form>}
                       {latestRun && <div className="candidate-run-results">
-                        <p className="candidate-run-meta">{latestRun.total_candidates} eligible windows · {latestRun.min_duration_seconds}–{latestRun.max_duration_seconds}s · sorted by source time{latestRun.sampled_evenly ? ` · ${latestRun.candidates.length} sampled evenly across the source` : ""}</p>
+                        <p className="candidate-run-meta">Showing window 00 only · {latestRun.total_candidates} eligible windows · {latestRun.min_duration_seconds}–{latestRun.max_duration_seconds}s</p>
                         <ol className="candidate-list">
-                          {latestRun.candidates.map((candidate) => <li className="candidate-card" key={candidate.id}>
+                          {latestRun.candidates.filter((candidate) => candidate.ordinal === 0).map((candidate) => <li className="candidate-card" key={candidate.id}>
                             <div className="candidate-card-top"><span>WINDOW {candidate.ordinal.toString().padStart(2, "0")}</span><time>{formatTimestamp(candidate.start_ms)}–{formatTimestamp(candidate.end_ms)}</time><span className={`candidate-status candidate-status-${candidate.status}`}>{candidate.status.toUpperCase()}</span></div>
                             <p className="candidate-quote">“{candidate.transcript_excerpt}”</p>
                             <ul className="candidate-signals">{candidate.signals.map((signal) => <li key={signal}>{signal}</li>)}</ul>
-                            {latestRun && <CreatorEditor projectId={project.id} transcriptionJobId={latestRun.transcription_job_id} sourceDuration={source.duration_seconds} candidate={candidate} readOnly={!canEdit} onSaved={loadWorkspace} />}
+                            {latestRun && candidate.ordinal === 0 && <CreatorEditor projectId={project.id} transcriptionJobId={latestRun.transcription_job_id} sourceDuration={source.duration_seconds} candidate={candidate} readOnly={!canEdit} onSaved={loadWorkspace} minRenderDuration={minRenderDuration} maxRenderDuration={maxRenderDuration} onRender={() => void renderCandidate(project, candidate)} renderDisabled={busyId === project.id || !["selected", "edited"].includes(candidate.status) || candidate.end_ms - candidate.start_ms < minRenderDuration * 1000 || candidate.end_ms - candidate.start_ms > maxRenderDuration * 1000 || candidate.render_jobs?.some((render) => ACTIVE_RENDER_STATUSES.has(render.status))} />}
                             {canEdit && <div className="candidate-review-actions"><button type="button" onClick={() => void updateCandidateStatus(project, candidate, "selected")} disabled={busyId === project.id || candidate.status === "selected"}>Select</button><button type="button" onClick={() => void updateCandidateStatus(project, candidate, "rejected")} disabled={busyId === project.id || candidate.status === "rejected"}>Reject</button></div>}
-                            <div className="render-panel"><p className="panel-kicker">MILESTONE 04 · LOCAL DRAFT EXPORT</p><p>9:16 · 720 × 1280 · MP4 · full frame fit with blurred background · captions burned in</p>
-                              {canEdit && <button type="button" onClick={() => void renderCandidate(project, candidate)} disabled={busyId === project.id || !["selected", "edited"].includes(candidate.status) || candidate.render_jobs?.some((render) => ACTIVE_RENDER_STATUSES.has(render.status))}>Render selected clip</button>}
+                            {candidate.ordinal === 0 && <div className="render-panel"><p className="panel-kicker">MILESTONE 04 · LOCAL DRAFT EXPORT</p><p>9:16 · 720 × 1280 · MP4 · {minRenderDuration}–{maxRenderDuration} seconds · full frame fit with blurred background · no on-video captions</p>
+                              {canEdit && <p>Use the Render video button above after selecting this moment and setting a valid duration.</p>}
+                              {canEdit && (candidate.end_ms - candidate.start_ms < minRenderDuration * 1000 || candidate.end_ms - candidate.start_ms > maxRenderDuration * 1000) && <p className="job-failure" role="status">Adjust this clip to {minRenderDuration}–{maxRenderDuration} seconds in the editor before rendering.</p>}
                               {candidate.render_jobs?.map((render) => <div className="render-result" key={render.id}>
                                 <strong>{render.status === "complete" ? "Draft ready" : render.status === "failed" ? "Render failed" : render.status.replaceAll("_", " ")}</strong>
                                 {render.progress_percent !== null && ACTIVE_RENDER_STATUSES.has(render.status) && <div className="job-progress" aria-label={`${render.progress_percent}% complete`}><span style={{ width: `${render.progress_percent}%` }} /></div>}
                                 {render.failure_message && <p className="job-failure" role="alert">{render.failure_message}</p>}
-                                {render.status === "complete" && render.download_url && <><video controls preload="metadata" src={`${API}${render.download_url}`} aria-label={`Preview of ${candidate.title}`} /><p>{render.duration_ms ? `${(render.duration_ms / 1000).toFixed(1)} seconds` : ""} · {render.output_size_bytes ? formatBytes(render.output_size_bytes) : ""}</p><a href={`${API}${render.download_url}`} download>Download MP4</a>{render.captions_url && <> · <a href={`${API}${render.captions_url}`} download>Download SRT captions</a></>}</>}
+                                {render.status === "complete" && render.download_url && <><video controls preload="metadata" src={`${API}${render.download_url}`} aria-label={`Preview of ${candidate.title}`} /><p>{render.duration_ms ? `${(render.duration_ms / 1000).toFixed(1)} seconds` : ""} · {render.output_size_bytes ? formatBytes(render.output_size_bytes) : ""}</p><a href={`${API}${render.download_url}`} download>Download this video (MP4)</a>{render.captions_url && <> · <a href={`${API}${render.captions_url}`} download>Download SRT captions</a></>}</>}
                                 {canEdit && ACTIVE_RENDER_STATUSES.has(render.status) && <button type="button" onClick={() => void cancelRender(project, render)} disabled={busyId === project.id}>Cancel render</button>}
                                 {canEdit && render.retryable && <button type="button" onClick={() => void retryRender(project, render)} disabled={busyId === project.id}>Retry render</button>}
                               </div>)}
-                            </div>
+                            </div>}
                           </li>)}
                         </ol>
                       </div>}
