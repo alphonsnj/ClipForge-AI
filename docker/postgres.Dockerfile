@@ -1,6 +1,7 @@
-# Build the official gosu 1.20 source with the patched moby/sys/user dependency.
+# Build the official gosu 1.20 source with the patched moby/sys/user dependency
+# and a Go toolchain that includes the latest applicable standard-library fixes.
 # Both inputs are pinned: the builder image by digest and gosu by upstream commit.
-FROM --platform=$BUILDPLATFORM golang:1.24.6-alpine@sha256:c8c5f95d64aa79b6547f3b626eb84b16a7ce18a139e3e9ca19a8c078b85ba80d AS gosu-builder
+FROM --platform=$BUILDPLATFORM golang:1.26.11-alpine@sha256:ae52b5bc6ed045a9ed26ab03dc19327a802a9cc9aa8b27ed57f5c6b60579b0bb AS gosu-builder
 
 ARG TARGETARCH
 ARG GOSU_COMMIT=29b939aa5bd4dc588af765b8248f6e39150d2565
