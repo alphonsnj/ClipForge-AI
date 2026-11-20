@@ -1,23 +1,70 @@
 # ClipForge AI
 
-**[Try ClipForge on your computer](#try-it-locally)** · [How it works](#how-it-works) · [Project roadmap](docs/implementation-roadmap.md)
+![ClipForge CI](https://github.com/alphonsnj/ClipForge-AI/actions/workflows/ci.yml/badge.svg?branch=main)
 
-ClipForge AI turns a long video file you own or are allowed to process into a reviewable short-form clip. It transcribes speech, suggests transcript-aligned moments, and lets you edit a clip before rendering an MP4 with its original audio. Captions are available as a separate SRT download, not burned into the video. Every rendered clip is at least 60 seconds long.
+**[Try it locally](#try-it-locally)** · [See the workflow](#the-clipforge-workflow) · [Features](#what-you-can-do) · [Roadmap](docs/implementation-roadmap.md)
+
+ClipForge AI is a local-first video editing project for turning a long video you own or are allowed to process into a short-form draft. It transcribes speech, proposes moments tied to transcript timestamps, and gives you an editor to shape and render a clip. Every rendered MP4 is at least 60 seconds long, keeps the source audio, and has no captions burned into the picture; captions can be downloaded separately as an SRT file.
 
 ClipForge does not fetch video from YouTube URLs, generate pictures, or claim that a clip will trend. A YouTube URL can be saved as a project reference; to make clips, upload the authorized MP4 or MOV file. Suggested moments are chronological and need a human to choose what works.
 
-> **Trying it:** there is no public hosted demo yet. The link above explains how to run the app locally, then use **Try it without signing in** to open a guest workspace. A shareable live link will require a real deployment; `localhost` links work only on the computer running ClipForge.
+> **Try it:** there is no public hosted demo yet. Follow the [local setup](#try-it-locally), then choose **Try it without signing in**. That starts a private trial workspace on your own computer. The `localhost` address is local to the computer running the app; it is not a shared public website.
 
-## How it works
+## The ClipForge workflow
 
-1. Create a project and optionally save a YouTube URL as a reference.
-2. Upload an MP4 or MOV file that you own or have permission to process.
-3. ClipForge extracts the audio and a background worker transcribes it with faster-whisper. Job state and timestamped transcript segments are stored in PostgreSQL.
-4. Review suggested moments aligned with the transcript. The suggestions are not viral scores or guarantees of performance.
-5. Adjust the clip’s start/end points, title, framing, focus, and transcript text in the editor. The rendered clip must be at least 60 seconds.
-6. Render and preview the MP4 with its original sound. Download the MP4 and, if needed, its separate SRT captions file.
+```mermaid
+flowchart LR
+    A[Create a project] --> B[Upload an authorized MP4 or MOV]
+    A -. optional reference .-> Y[Save a YouTube URL]
+    B --> C[Extract audio with FFmpeg]
+    C --> D[Transcribe speech with faster-whisper]
+    D --> E[Review transcript-aligned moments]
+    E --> F[Edit timing, title, framing, and transcript]
+    F --> G[Render and preview a 60-second-or-longer MP4]
+    G --> H[Download MP4 and optional SRT]
+```
 
-The local app uses a Next.js frontend, a FastAPI backend, PostgreSQL for project and job data, Redis to wake the worker, and FFmpeg plus faster-whisper for media processing. The implementation roadmap and milestone notes document what is complete and what remains.
+1. **Start a project.** Give it a name. A YouTube URL can be saved as a reference if useful.
+2. **Add your video.** Upload an MP4 or MOV you own or have permission to process. ClipForge accepts files up to 500 MB and 60 minutes.
+3. **Get the transcript.** A background worker extracts audio with FFmpeg and transcribes it locally with faster-whisper. Timestamped transcript segments and job progress are saved in PostgreSQL.
+4. **Choose a moment.** Review candidate moments beside their transcript excerpts. The app presents moments for human review; it does not rank them by virality.
+5. **Make the draft yours.** Adjust the in/out points, title, aspect ratio, crop/focus, and transcript corrections. The clip must be at least 60 seconds.
+6. **Preview and export.** Render an MP4 with the source sound, then download it. Captions are a separate SRT file and are not overlaid on the video.
+
+## What you can do
+
+| In ClipForge | What it means |
+| --- | --- |
+| Local guest workspace | Try project creation and editing without entering an email or password. Guest access is for local development and cannot be recovered if its browser session is lost. |
+| Video intake | Upload permitted MP4/MOV files (500 MB, 60-minute maximum) or save a YouTube URL as a project reference. |
+| Transcript and moment review | Follow transcription progress, inspect timestamped text, and review transcript-aligned candidate windows. |
+| Creator editor | Preview the source audio and video, set clip timing, edit the title and transcript, and adjust portrait/square/landscape framing. |
+| Video export | Render a 60–180 second MP4 with original sound and download its separate SRT captions file. |
+| Workspace access | Use local owner/editor/reviewer accounts, optional invitations, and project-level membership controls. |
+
+### What this project does not do
+
+- It does **not** download or transcribe a video from its YouTube URL. Upload an authorized video file to process it.
+- It does **not** predict trends, promise virality, or automatically decide which moment will perform best.
+- It does **not** add generated pictures or burn captions into the exported MP4.
+
+## How the pieces fit together
+
+The Next.js workspace talks to a FastAPI backend. PostgreSQL stores projects, transcripts, and job state; Redis wakes a separate worker; the worker uses FFmpeg and faster-whisper for media processing. Source files and renders stay in local private storage in the Docker setup, with source files automatically deleted after seven days.
+
+```mermaid
+flowchart LR
+    Browser[Next.js workspace] --> API[FastAPI]
+    API --> DB[(PostgreSQL)]
+    API --> Queue[(Redis queue)]
+    Queue --> Worker[Background worker]
+    Worker --> Media[FFmpeg and faster-whisper]
+    Worker --> DB
+    Worker --> Storage[(Private local media storage)]
+    Browser --> API
+```
+
+The implementation roadmap and milestone notes document what is complete and what remains.
 
 ## Current milestone: production readiness
 
@@ -40,18 +87,20 @@ YouTube URL references are stored with projects, but YouTube video bytes are not
 
 ## Prerequisites
 
-Target setup: Apple Silicon Mac with 16 GB unified memory, Node.js 22, Python 3.12, Docker Desktop, and FFmpeg/ffprobe. The worker defaults to faster-whisper `small` on CPU with int8 compute and one worker process. The provided backend configuration pins the model revision and PyAV version. Model weights are downloaded into `data/models/` on the first transcription request, not during setup.
+For the Docker quick start, install and start Docker Desktop (or Docker Engine with the Compose plugin). The recommended transcription target is an Apple Silicon Mac with 16 GB unified memory; other machines may run it, but transcription speed and available resources will vary. The worker uses faster-whisper `small` on CPU with int8 compute. It downloads the pinned model weights the first time you transcribe a video, so the first job can take a few minutes and needs an internet connection.
 
-## Quick local try (Docker)
+## Try it locally
 
 Docker runs PostgreSQL, Redis, the API, the transcription worker, and the frontend together. From the repository root:
 
 ```sh
+git clone https://github.com/alphonsnj/ClipForge-AI.git
+cd ClipForge-AI
 docker compose up -d --build
 docker compose ps
 ```
 
-Wait for the API and frontend to report healthy, then open `http://localhost:3000`. Choose **Try it without signing in** to create a private, local guest workspace, or set up/sign into an account. Guest access is enabled only in the loopback-bound local Compose setup; hosted Compose disables it. Guest workspaces use the same project isolation, CSRF checks, and rate limits as account sessions, but cannot be recovered if the browser session is lost. Download anything you want to keep before signing out. Create a project, save a YouTube URL as a reference if useful, and upload a source video file you own or have permission to process. A URL alone does not provide video bytes to the clip workflow. The first transcription downloads the pinned speech model and can take a few minutes.
+Wait for the API and frontend to report healthy, then open **[http://localhost:3000](http://localhost:3000)** and choose **Try it without signing in**. In the workspace, choose **New project**, upload a permitted MP4/MOV, confirm the permission checkbox, and start transcription. Guest access is enabled only in local Compose and uses the same project isolation, CSRF checks, and rate limits as account sessions. Its browser session can’t be recovered if lost, so download exports before signing out. The first transcription downloads the speech model and may take a few minutes.
 
 To stop the app while keeping projects and uploads, run `docker compose down`. This local setup binds the app and database ports to loopback; keep it on this computer.
 
