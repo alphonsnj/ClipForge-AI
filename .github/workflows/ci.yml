@@ -1,0 +1,83 @@
+name: ClipForge CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: "31 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    name: Frontend build and dependency audit
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run typecheck
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+      - run: npm audit --audit-level=moderate
+        working-directory: frontend
+
+  backend:
+    name: Backend syntax and dependency audit
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.12"
+      - run: docker compose config > /dev/null
+      - run: docker compose --env-file deploy/hosted.env.example -f compose.hosted.yaml config > /dev/null
+      - run: python -m compileall -q backend/app backend/alembic/versions
+      - run: python -m pip install --disable-pip-version-check pip-audit
+      - run: pip-audit -r backend/requirements.txt
+
+  infrastructure:
+    name: Compose image vulnerability scan
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ["clipforge-postgres:16-alpine", "redis:7-alpine", "clipforge-backend:local", "clipforge-frontend:local"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - if: matrix.image == 'clipforge-postgres:16-alpine'
+        name: Build PostgreSQL image with patched gosu
+        run: docker build -f docker/postgres.Dockerfile -t clipforge-postgres:16-alpine .
+      - if: matrix.image == 'redis:7-alpine'
+        name: Pull Redis Compose image
+        run: docker pull redis:7-alpine
+      - if: matrix.image == 'clipforge-backend:local'
+        name: Build backend and worker image
+        run: docker build -f backend/Dockerfile -t clipforge-backend:local backend
+      - if: matrix.image == 'clipforge-frontend:local'
+        name: Build frontend image
+        run: docker build -f frontend/Dockerfile --build-arg NEXT_PUBLIC_API_BASE_URL= -t clipforge-frontend:local frontend
+      - name: Scan Compose image for high and critical vulnerabilities
+        env:
+          IMAGE: ${{ matrix.image }}
+        run: >-
+          docker run --rm
+          -v /var/run/docker.sock:/var/run/docker.sock
+          -v "$GITHUB_WORKSPACE:/workspace:ro"
+          aquasec/trivy:0.76.1@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c
+          image --image-src docker
+          --ignorefile /workspace/.trivyignore.yaml
+          --ignore-unfixed
+          --severity CRITICAL,HIGH
+          --scanners vuln
+          --exit-code 1
+          --no-progress
+          "$IMAGE"

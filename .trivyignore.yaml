@@ -1,0 +1,109 @@
+# Temporary, package-scoped exception for the upstream PostgreSQL image's
+# embedded gosu binary. gosu's maintainers document that generic Go stdlib
+# scanners report APIs the binary does not call; re-evaluate after expiry and
+# when the base image/gosu binary changes. This is not a general CVE waiver.
+vulnerabilities:
+  - id: CVE-2025-68121
+    purls: ["pkg:golang/stdlib@v1.24.6"]
+    expired_at: 2027-02-04
+    statement: "Upstream gosu security policy classifies generic stdlib findings as potentially unreachable; scoped to the embedded gosu component and expires for re-review."
+  - id: CVE-2025-61726
+    purls: ["pkg:golang/stdlib@v1.24.6"]
+    expired_at: 2027-02-04
+    statement: "Upstream gosu security policy classifies generic stdlib findings as potentially unreachable; scoped to the embedded gosu component and expires for re-review."
+  - id: CVE-2025-61729
+    purls: ["pkg:golang/stdlib@v1.24.6"]
+    expired_at: 2027-02-04
+    statement: "Upstream gosu security policy classifies generic stdlib findings as potentially unreachable; scoped to the embedded gosu component and expires for re-review."
+  - id: CVE-2026-111943
+    purls: ["pkg:golang/stdlib@v1.24.6"]
+    expired_at: 2027-02-04
+    statement: "Upstream gosu security policy classifies generic stdlib findings as potentially unreachable; scoped to the embedded gosu component and expires for re-review."
+  - id: CVE-2026-25679
+    purls: ["pkg:golang/stdlib@v1.24.6"]
+    expired_at: 2027-02-04
+    statement: "Upstream gosu security policy classifies generic stdlib findings as potentially unreachable; scoped to the embedded gosu component and expires for re-review."
+  - id: CVE-2026-27145
+    purls: ["pkg:golang/stdlib@v1.24.6"]
+    expired_at: 2027-02-04
+    statement: "Upstream gosu security policy classifies generic stdlib findings as potentially unreachable; scoped to the embedded gosu component and expires for re-review."
+  - id: CVE-2026-32280
+    purls: ["pkg:golang/stdlib@v1.24.6"]
+    expired_at: 2027-02-04
+    statement: "Upstream gosu security policy classifies generic stdlib findings as potentially unreachable; scoped to the embedded gosu component and expires for re-review."
+  - id: CVE-2026-32281
+    purls: ["pkg:golang/stdlib@v1.24.6"]
+    expired_at: 2027-02-04
+    statement: "Upstream gosu security policy classifies generic stdlib findings as potentially unreachable; scoped to the embedded gosu component and expires for re-review."
+  - id: CVE-2026-32283
+    purls: ["pkg:golang/stdlib@v1.24.6"]
+    expired_at: 2027-02-04
+    statement: "Upstream gosu security policy classifies generic stdlib findings as potentially unreachable; scoped to the embedded gosu component and expires for re-review."
+  - id: CVE-2026-33811
+    purls: ["pkg:golang/stdlib@v1.24.6"]
+    expired_at: 2027-02-04
+    statement: "Upstream gosu security policy classifies generic stdlib findings as potentially unreachable; scoped to the embedded gosu component and expires for re-review."
+  - id: CVE-2026-33814
+    purls: ["pkg:golang/stdlib@v1.24.6"]
+    expired_at: 2027-02-04
+    statement: "Upstream gosu security policy classifies generic stdlib findings as potentially unreachable; scoped to the embedded gosu component and expires for re-review."
+  - id: CVE-2026-33818
+    purls: ["pkg:golang/stdlib@v1.24.6"]
+    expired_at: 2027-02-04
+    statement: "Upstream gosu security policy classifies generic stdlib findings as potentially unreachable; scoped to the embedded gosu component and expires for re-review."
+  - id: CVE-2026-39820
+    purls: ["pkg:golang/stdlib@v1.24.6"]
+    expired_at: 2027-02-04
+    statement: "Upstream gosu security policy classifies generic stdlib findings as potentially unreachable; scoped to the embedded gosu component and expires for re-review."
+  - id: CVE-2026-39821
+    purls: ["pkg:golang/stdlib@v1.24.6"]
+    expired_at: 2027-02-04
+    statement: "Upstream gosu security policy classifies generic stdlib findings as potentially unreachable; scoped to the embedded gosu component and expires for re-review."
+  - id: CVE-2026-39822
+    purls: ["pkg:golang/stdlib@v1.24.6"]
+    expired_at: 2027-02-04
+    statement: "Upstream gosu security policy classifies generic stdlib findings as potentially unreachable; scoped to the embedded gosu component and expires for re-review."
+  - id: CVE-2026-39836
+    purls: ["pkg:golang/stdlib@v1.24.6"]
+    expired_at: 2027-02-04
+    statement: "Upstream gosu security policy classifies generic stdlib findings as potentially unreachable; scoped to the embedded gosu component and expires for re-review."
+  - id: CVE-2026-42499
+    purls: ["pkg:golang/stdlib@v1.24.6"]
+    expired_at: 2027-02-04
+    statement: "Upstream gosu security policy classifies generic stdlib findings as potentially unreachable; scoped to the embedded gosu component and expires for re-review."
+  - id: CVE-2026-42504
+    purls: ["pkg:golang/stdlib@v1.24.6"]
+    expired_at: 2027-02-04
+    statement: "Upstream gosu security policy classifies generic stdlib findings as potentially unreachable; scoped to the embedded gosu component and expires for re-review."
+  - id: CVE-2026-56853
+    purls: ["pkg:golang/stdlib@v1.24.6"]
+    expired_at: 2027-02-04
+    statement: "Upstream gosu security policy classifies generic stdlib findings as potentially unreachable; scoped to the embedded gosu component and expires for re-review."
+  - id: CVE-2026-56858
+    purls: ["pkg:golang/stdlib@v1.24.6"]
+    expired_at: 2027-02-04
+    statement: "Upstream gosu security policy classifies generic stdlib findings as potentially unreachable; scoped to the embedded gosu component and expires for re-review."
+  - id: CVE-2026-56859
+    purls: ["pkg:golang/stdlib@v1.24.6"]
+    expired_at: 2027-02-04
+    statement: "Upstream gosu security policy classifies generic stdlib findings as potentially unreachable; scoped to the embedded gosu component and expires for re-review."
+  - id: CVE-2026-56860
+    purls: ["pkg:golang/stdlib@v1.24.6"]
+    expired_at: 2027-02-04
+    statement: "Upstream gosu security policy classifies generic stdlib findings as potentially unreachable; scoped to the embedded gosu component and expires for re-review."
+  - id: CVE-2026-56862
+    purls: ["pkg:golang/stdlib@v1.24.6"]
+    expired_at: 2027-02-04
+    statement: "Upstream gosu security policy classifies generic stdlib findings as potentially unreachable; scoped to the embedded gosu component and expires for re-review."
+  - id: CVE-2026-78667
+    purls: ["pkg:golang/stdlib@v1.24.6"]
+    expired_at: 2027-02-04
+    statement: "Upstream gosu security policy classifies generic stdlib findings as potentially unreachable; scoped to the embedded gosu component and expires for re-review."
+  - id: CVE-2026-78669
+    purls: ["pkg:golang/stdlib@v1.24.6"]
+    expired_at: 2027-02-04
+    statement: "Upstream gosu security policy classifies generic stdlib findings as potentially unreachable; scoped to the embedded gosu component and expires for re-review."
+  - id: CVE-2026-97031
+    purls: ["pkg:golang/stdlib@v1.24.6"]
+    expired_at: 2027-02-04
+    statement: "Upstream gosu security policy classifies generic stdlib findings as potentially unreachable; scoped to the embedded gosu component and expires for re-review."
